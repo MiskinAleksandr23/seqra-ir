@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  ci-core:
+    name: Run core tests on JDK ${{ matrix.jdk }}
+    runs-on: ubuntu-latest
+    container: ubuntu:latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        jdk: [ 8, 11, 19 ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.jdk }}
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'main' }}
+
+      - name: Run tests
+        uses: gradle/gradle-build-action@v2
+        with:
+          arguments: check
+        env:
+          SEQRA_GITHUB_ACTOR: ${{ secrets.SEQRA_GITHUB_ACTOR }}
+          SEQRA_GITHUB_TOKEN: ${{ secrets.SEQRA_GITHUB_TOKEN }}
+
+      - name: Upload Gradle reports
+        if: (!cancelled())
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-reports-jdk${{ matrix.jdk }}
+          path: '**/build/reports/'
+          retention-days: 1
+
+  ci-lifecycle:
+    name: Run lifecycle tests
+    runs-on: ubuntu-latest
+    container: ubuntu:latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: 8
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'main' }}
+
+      - name: Run tests
+        uses: gradle/gradle-build-action@v2
+        with:
+          arguments: lifecycleTest
+        env:
+          SEQRA_GITHUB_ACTOR: ${{ secrets.SEQRA_GITHUB_ACTOR }}
+          SEQRA_GITHUB_TOKEN: ${{ secrets.SEQRA_GITHUB_TOKEN }}
+
+      - name: Upload Gradle reports
+        if: (!cancelled())
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-reports-lifecycle
+          path: '**/build/reports/'
+          retention-days: 1

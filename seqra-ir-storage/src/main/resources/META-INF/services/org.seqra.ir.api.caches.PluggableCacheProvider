@@ -1,0 +1,2 @@
+org.seqra.ir.impl.caches.guava.GuavaCacheProvider
+org.seqra.ir.impl.caches.xodus.XodusCacheProvider

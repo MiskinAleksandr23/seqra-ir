@@ -1,0 +1,3 @@
+org.seqra.ir.impl.storage.kv.xodus.XodusKeyValueStorageSPI
+org.seqra.ir.impl.storage.kv.lmdb.LmdbKeyValueStorageSPI
+org.seqra.ir.impl.storage.kv.rocks.RocksKeyValueStorageSPI

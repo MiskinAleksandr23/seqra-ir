@@ -1,0 +1,2 @@
+org.seqra.ir.impl.storage.ers.ram.RAMEntityRelationshipStorageSPI
+org.seqra.ir.impl.storage.ers.kv.KVEntityRelationshipStorageSPI
