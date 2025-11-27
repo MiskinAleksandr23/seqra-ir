@@ -21,6 +21,7 @@ import org.seqra.ir.impl.types.JIRTypedMethodImpl
 import org.seqra.ir.impl.types.TypeNameImpl
 import org.seqra.ir.impl.types.substition.JIRSubstitutorImpl
 import org.objectweb.asm.Type
+import org.seqra.ir.api.jvm.ext.JAVA_OBJECT
 
 class JIRUnknownClass(override var classpath: JIRClasspath, name: String) : JIRVirtualClassImpl(
     name,
@@ -37,6 +38,9 @@ class JIRUnknownClass(override var classpath: JIRClasspath, name: String) : JIRV
     }
 
     override fun hashCode(): Int = name.hashCode()
+
+    override val superClass: JIRClassOrInterface?
+        get() = if (name == JAVA_OBJECT) null else super.superClass
 }
 
 class JIRUnknownMethod(
