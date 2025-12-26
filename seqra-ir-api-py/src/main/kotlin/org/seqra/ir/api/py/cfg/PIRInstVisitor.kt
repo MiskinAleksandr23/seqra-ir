@@ -1,0 +1,44 @@
+package org.seqra.ir.api.py.cfg
+
+interface PIRInstVisitor<out T> {
+    fun visitPIRGotoInst(inst: PIRGotoInst): T
+    fun visitPIRBranchInst(inst: PIRBranchInst): T
+    fun visitPIRReturnInst(inst: PIRReturnInst): T
+    fun visitPIRUnreachableInst(inst: PIRUnreachableInst): T
+    fun visitPIRAssignInst(inst: PIRAssignInst): T
+    fun visitPIRAssignMultiInst(inst: PIRAssignMultiInst): T
+    fun visitPIRLoadErrorValueInst(inst: PIRLoadErrorValueInst): T
+    fun visitPIRLoadLiteralInst(inst: PIRLoadLiteralInst): T
+    fun visitPIRGetAttrInst(inst: PIRGetAttrInst): T
+    fun visitPIRSetAttrInst(inst: PIRSetAttrInst): T
+    fun visitPIRLoadStaticInst(inst: PIRLoadStaticInst): T
+    fun visitPIRInitStaticInst(inst: PIRInitStaticInst): T
+    fun visitPIRTupleGetInst(inst: PIRTupleGetInst): T
+    fun visitPIRTupleSetInst(inst: PIRTupleSetInst): T
+    fun visitPIRIncRefInst(inst: PIRIncRefInst): T
+    fun visitPIRDecRefInst(inst: PIRDecRefInst): T
+    fun visitPIRCallInst(inst: PIRCallInst): T
+    fun visitPIRCatchInst(inst: PIRCatchInst): T
+    fun visitPIRMethodCallInst(inst: PIRMethodCallInst): T
+    fun visitPIRCastInst(inst: PIRCastInst): T
+    fun visitPIRBoxInst(inst: PIRBoxInst): T
+    fun visitPIRUnboxInst(inst: PIRUnboxInst): T
+    fun visitPIRRaiseStandardErrorInst(inst: PIRRaiseStandardErrorInst): T
+    fun visitPIRCallCInst(inst: PIRCallCInst): T
+    fun visitPIRPrimitiveOpInst(inst: PIRPrimitiveOpInst): T
+    fun visitPIRTruncateInst(inst: PIRTruncateInst): T
+    fun visitPIRExtendInst(inst: PIRExtendInst): T
+    fun visitPIRLoadGlobalInst(inst: PIRLoadGlobalInst): T
+    fun visitPIRIntOpInst(inst: PIRIntOpInst): T
+    fun visitPIRComparisonOpInst(inst: PIRComparisonOpInst): T
+    fun visitPIRFloatOpInst(inst: PIRFloatOpInst): T
+    fun visitPIRFloatNegInst(inst: PIRFloatNegInst): T
+    fun visitPIRFloatComparisonOpInst(inst: PIRFloatComparisonOpInst): T
+    fun visitPIRLoadMemInst(inst: PIRLoadMemInst): T
+    fun visitPIRSetMemInst(inst: PIRSetMemInst): T
+    fun visitPIRGetElementPtrInst(inst: PIRGetElementPtrInst): T
+    fun visitPIRSetElementInst(inst: PIRSetElementInst): T
+    fun visitPIRLoadAddressInst(inst: PIRLoadAddressInst): T
+    fun visitPIRKeepAliveInst(inst: PIRKeepAliveInst): T
+    fun visitPIRUnborrowInst(inst: PIRUnborrowInst): T
+}
