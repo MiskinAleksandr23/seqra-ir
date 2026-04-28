@@ -6,6 +6,8 @@ import ir.FileList
 import ir.IRServiceGrpcKt
 import ir.SourceRequest
 import kotlinx.coroutines.runBlocking
+import org.seqra.ir.api.py.emit.EmitMode
+import org.seqra.ir.api.py.emit.EmitOptions
 import org.seqra.ir.api.py.emit.PIRToPythonEmitter
 import org.seqra.ir.api.py.mapper.ProtoToPirMapper
 import java.io.File
@@ -19,7 +21,8 @@ private data class ClientConfig(
     val files: List<String>,
     val outputDir: Path,
     val jsonOutput: Path?,
-    val includeMetadata: Boolean
+    val includeMetadata: Boolean,
+    val emitOptions: EmitOptions
 )
 
 fun main(args: Array<String>): Unit = runBlocking {
@@ -67,7 +70,7 @@ fun main(args: Array<String>): Unit = runBlocking {
     val mapper = ProtoToPirMapper()
     val pirModules = mapper.mapComplete(response)
 
-    val emitter = PIRToPythonEmitter()
+    val emitter = PIRToPythonEmitter(config.emitOptions)
     Files.createDirectories(config.outputDir)
 
     pirModules.forEach { module ->
@@ -87,6 +90,9 @@ private fun parseArgs(args: Array<String>): ClientConfig? {
     var outputDir = Path.of(System.getenv("SEQRA_PY_OUT_DIR") ?: ".")
     var jsonOutput: Path? = null
     var includeMetadata = true
+    var emitMode = EmitMode.fromCli(System.getenv("SEQRA_PY_EMIT_MODE") ?: EmitMode.FUZZ.cliName)
+    var failOnUnsupported =
+        (System.getenv("SEQRA_PY_FAIL_ON_UNSUPPORTED") ?: "true").toBooleanStrictOrNull() ?: true
     val files = mutableListOf<String>()
 
     var index = 0
@@ -109,6 +115,10 @@ private fun parseArgs(args: Array<String>): ClientConfig? {
             "--json-out" -> {
                 jsonOutput = Path.of(args.getOrNull(++index) ?: error("Missing value for --json-out"))
             }
+            "--emit-mode" -> {
+                emitMode = EmitMode.fromCli(args.getOrNull(++index) ?: error("Missing value for --emit-mode"))
+            }
+            "--allow-unsupported" -> failOnUnsupported = false
             "--no-metadata" -> includeMetadata = false
             else -> {
                 require(!arg.startsWith("--")) { "Unknown option: $arg" }
@@ -129,7 +139,8 @@ private fun parseArgs(args: Array<String>): ClientConfig? {
         files = files,
         outputDir = outputDir,
         jsonOutput = jsonOutput,
-        includeMetadata = includeMetadata
+        includeMetadata = includeMetadata,
+        emitOptions = EmitOptions(mode = emitMode, failOnUnsupported = failOnUnsupported)
     )
 }
 
@@ -143,7 +154,7 @@ private fun moduleOutputPath(moduleName: String, outputDir: Path): Path {
 private fun printUsage() {
     println(
         """
-        Usage: MainKt [--host HOST] [--port PORT] [--out-dir DIR] [--json-out FILE] [--no-metadata] <python-file>...
+        Usage: MainKt [--host HOST] [--port PORT] [--out-dir DIR] [--json-out FILE] [--emit-mode fuzz|debug-ir] [--allow-unsupported] [--no-metadata] <python-file>...
         """.trimIndent()
     )
 }

@@ -1,0 +1,6 @@
+{
+  "description": "Simple integer branch with two arithmetic paths",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [7]
+}

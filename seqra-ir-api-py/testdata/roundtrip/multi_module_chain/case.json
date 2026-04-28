@@ -1,0 +1,6 @@
+{
+  "description": "Two helper modules chained through main",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [5]
+}

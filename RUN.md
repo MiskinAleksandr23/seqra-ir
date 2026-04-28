@@ -31,6 +31,15 @@ pip install mypy grpcio protobuf
 ./gradlew :seqra-ir-api-py:test
 ```
 
+Это прогоняет Kotlin unit-тесты эмиттера и mapper-а. Вывод тестов будет примерно такой:
+
+```text
+MapperEmitterTest > supports explicit debug emitter mode() PASSED
+MapperEmitterTest > emits dedicated sentinel for load error value() PASSED
+...
+BUILD SUCCESSFUL
+```
+
 ## 4. Запустить Python gRPC server
 
 Во втором терминале:
@@ -124,8 +133,81 @@ seqra-ir-api-py/src/main/kotlin/org/seqra/ir/api/py/grpc
 
 - Generated Python сейчас IR-подобный, а не восстановленный исходник один в один.
 
+## Differential round-trip examples
+
+В репозитории есть небольшой corpus примеров:
+
+```text
+seqra-ir-api-py/testdata/roundtrip
+```
+
+Его можно прогнать одной командой:
+
+```bash
+python seqra-ir-api-py/scripts/run_roundtrip_examples.py --server-python /absolute/path/to/seqra-ir/.venv/bin/python --runtime-python python3
+```
+
+Это уже end-to-end проверка всего пути:
+
+- `original python`
+- `mypy IR`
+- `proto`
+- `Kotlin PIR`
+- `generated python`
+
+И сравнение поведения `original` и `generated`.
+
+Пример ожидаемого вывода:
+
+```text
+=== branching_math ===
+Original result:
+{
+  "result": 5,
+  "result_type": "int",
+  "status": "ok"
+}
+
+Generated result:
+{
+  "result": 5,
+  "result_type": "int",
+  "status": "ok"
+}
+
+Comparison: MATCH
+...
+Summary: all 3 cases passed
+```
+
+Если нужен один кейс:
+
+```bash
+python seqra-ir-api-py/scripts/run_roundtrip_examples.py --server-python /absolute/path/to/seqra-ir/.venv/bin/python --runtime-python python3 --case cross_module_call
+```
+
+Если нужен полный локальный прогон “всего сразу”, то сейчас это две команды:
+
+```bash
+./gradlew :seqra-ir-api-py:test
+python seqra-ir-api-py/scripts/run_roundtrip_examples.py --server-python /absolute/path/to/seqra-ir/.venv/bin/python --runtime-python python3
+```
+
+Внутри runner использует:
+
+- `seqra-ir-api-py/scripts/py_diff_harness.py`
+- `seqra-ir-api-py/testdata/roundtrip/*`
+
+И сравнивает поведение:
+
+- original module
+- generated module
+
+По результату функции из `case.json`.
+
 ## Полезные файлы
 
 - `py-pipeline-notes.md` — подробные заметки по pipeline
 - `seqra-ir-api-py/src/main/kotlin/org/seqra/ir/api/py/grpc/python_server.py` — Python gRPC server
 - `seqra-ir-api-py/src/main/kotlin/org/seqra/ir/api/py/grpc/Main.kt` — Kotlin client
+- `seqra-ir-api-py/scripts/run_roundtrip_examples.py` — batch-runner для corpus

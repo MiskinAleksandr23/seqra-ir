@@ -568,7 +568,9 @@ def convert_op(op: Op, block_labels: dict[int, int] | None = None) -> ir_pb2.Op:
                 truncated_type = getattr(desc, "truncated_type", None)
                 if truncated_type is not None:
                     primitive_desc.truncated_type.CopyFrom(convert_rtype(truncated_type))
-                primitive_desc.ordering.extend(list(getattr(desc, "ordering", [])))
+                ordering = getattr(desc, "ordering", None)
+                if ordering:
+                    primitive_desc.ordering.extend(list(ordering))
                 primitive_op.desc.CopyFrom(primitive_desc)
 
             register_op.primitive_op.CopyFrom(primitive_op)

@@ -1,0 +1,6 @@
+{
+  "description": "Cross-module direct call through generated imports",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [3]
+}
