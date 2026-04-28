@@ -20,6 +20,12 @@
 python seqra-ir-api-py/scripts/run_roundtrip_examples.py
 ```
 
+Небольшой generator для случайных кейсов в уже поддержанном подмножестве запускается так:
+
+```bash
+python seqra-ir-api-py/scripts/run_python_fuzz.py --count 20 --seed 7
+```
+
 Сейчас corpus покрывает:
 
 - простые межмодульные вызовы
