@@ -1,0 +1,6 @@
+{
+  "description": "Recursive DFS over an implicit binary tree with left-first search",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [11]
+}

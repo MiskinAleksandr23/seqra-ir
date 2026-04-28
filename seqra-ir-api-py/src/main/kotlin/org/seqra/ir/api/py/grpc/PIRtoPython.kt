@@ -415,6 +415,15 @@ class PIRToPythonEmitter(
             "CPyTagged_Multiply" ->
                 if (taggedArgs.size == 2) "(${taggedArgs[0]} * ${taggedArgs[1]})" else "__pir_call_c(${quote(expr.functionName)}, ${args.joinToString(", ")})"
 
+            "CPyTagged_Remainder" ->
+                if (taggedArgs.size == 2) "(${taggedArgs[0]} % ${taggedArgs[1]})" else "__pir_call_c(${quote(expr.functionName)}, ${args.joinToString(", ")})"
+
+            "CPyTagged_Rshift" ->
+                if (taggedArgs.size == 2) "(${taggedArgs[0]} >> ${taggedArgs[1]})" else "__pir_call_c(${quote(expr.functionName)}, ${args.joinToString(", ")})"
+
+            "CPyTagged_TrueDivide" ->
+                if (taggedArgs.size == 2) "(${taggedArgs[0]} / ${taggedArgs[1]})" else "__pir_call_c(${quote(expr.functionName)}, ${args.joinToString(", ")})"
+
             "PyNumber_Add" ->
                 if (args.size == 2) "(${args[0]} + ${args[1]})" else "__pir_call_c(${quote(expr.functionName)}, ${args.joinToString(", ")})"
 

@@ -1,0 +1,6 @@
+{
+  "description": "While loop with else clause after normal termination",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [4]
+}

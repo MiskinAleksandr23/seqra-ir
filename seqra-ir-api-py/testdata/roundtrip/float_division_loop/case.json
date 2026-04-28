@@ -1,0 +1,6 @@
+{
+  "description": "While loop with true division and float accumulation",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [4]
+}

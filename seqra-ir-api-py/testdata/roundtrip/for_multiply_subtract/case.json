@@ -1,0 +1,6 @@
+{
+  "description": "For-range loop with repeated multiply and subtract updates",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [4]
+}

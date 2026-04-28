@@ -1,0 +1,6 @@
+{
+  "description": "Recursive fibonacci with two self-calls",
+  "entry_file": "main.py",
+  "function": "fib",
+  "args_json": [6]
+}

@@ -1,5 +1,6 @@
 package org.seqra.ir.api.py.mapper
 
+import com.google.protobuf.MessageOrBuilder
 import ir.*
 import ir.Function
 import org.seqra.ir.api.py.*
@@ -11,6 +12,12 @@ class ProtoToPirMapper {
     private val shallowClassCache = mutableMapOf<String, PIRClass>()
     private val moduleOwnerCache = mutableMapOf<String, PIRClass>()
     private val syntheticResultCache = IdentityHashMap<Op, PIRRegister>()
+    private val exactSyntheticResultHistory = mutableMapOf<String, MutableList<PIRRegister>>()
+    private val syntheticResultHistory = mutableMapOf<String, MutableList<PIRRegister>>()
+    private val syntheticNameCounts = mutableMapOf<String, Int>()
+    private val currentReferenceReadIndices = mutableMapOf<String, Int>()
+    private val currentWeakReferenceCounts = mutableMapOf<String, Int>()
+    private var currentReferencingOp: Op? = null
 
     fun mapComplete(response: CompleteResponse): List<PIRModule> {
         return response.modules.modulesList.map(::mapModule)
@@ -83,6 +90,11 @@ class ProtoToPirMapper {
     }
 
     fun mapFunction(proto: Function, owner: PIRClass? = null): PIRFunc {
+        syntheticResultCache.clear()
+        exactSyntheticResultHistory.clear()
+        syntheticResultHistory.clear()
+        syntheticNameCounts.clear()
+
         val resolvedOwner = owner ?: syntheticModuleOwner(proto.decl.moduleName)
         val decl = mapFuncDecl(proto.decl, proto.argRegsList)
         val argRegs = proto.argRegsList.map(::mapRegister)
@@ -152,9 +164,24 @@ class ProtoToPirMapper {
         }
 
         return when (op.opCase) {
-            Op.OpCase.BASE_ASSING -> mapBaseAssign(op.baseAssing, location)
-            Op.OpCase.CONTROL_OP -> mapControlOp(op.controlOp, location, blockRanges, instructionsProvider)
-            Op.OpCase.REGISTER_OP -> mapRegisterOp(op, op.registerOp, location)
+            Op.OpCase.BASE_ASSING -> {
+                currentReferenceReadIndices.clear()
+                currentWeakReferenceCounts.clear()
+                currentReferencingOp = op
+                mapBaseAssign(op.baseAssing, location)
+            }
+            Op.OpCase.CONTROL_OP -> {
+                currentReferenceReadIndices.clear()
+                currentWeakReferenceCounts.clear()
+                currentReferencingOp = op
+                mapControlOp(op.controlOp, location, blockRanges, instructionsProvider)
+            }
+            Op.OpCase.REGISTER_OP -> {
+                currentReferenceReadIndices.clear()
+                currentWeakReferenceCounts.clear()
+                currentReferencingOp = op
+                mapRegisterOp(op, op.registerOp, location)
+            }
             Op.OpCase.OP_NOT_SET,
             null -> error("Unsupported empty op at index $index")
         }
@@ -267,7 +294,6 @@ class ProtoToPirMapper {
         location: PIRInstLocation
     ): PIRInst {
         val errorKind = mapErrorKind(proto.errorKind)
-
         return when (proto.registerOpCase) {
             RegisterOp.RegisterOpCase.INC_REF -> PIREffectInst(
                 location,
@@ -288,7 +314,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.CALL -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "call", location.line),
+                op = op,
+                fallbackName = "call",
                 expr = PIRDirectCallExpr(
                     funcDecl = mapFuncDecl(proto.call.fn, emptyList()),
                     args = proto.call.argsList.map(::mapValue),
@@ -300,7 +327,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.METHOD_CALL -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "method_call", location.line),
+                op = op,
+                fallbackName = "method_call",
                 expr = PIRMethodCallExpr(
                     obj = mapValue(proto.methodCall.obj),
                     method = proto.methodCall.method,
@@ -314,7 +342,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.PRIMITIVE_OP -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "primitive_op", location.line),
+                op = op,
+                fallbackName = "primitive_op",
                 expr = PIRPrimitiveCallExpr(
                     primitive = mapPrimitiveDescription(proto.primitiveOp.desc),
                     args = proto.primitiveOp.argsList.map(::mapValue),
@@ -326,7 +355,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.LOAD_ERROR_VALUE -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "load_error_value", location.line),
+                op = op,
+                fallbackName = "load_error_value",
                 expr = PIRLoadErrorValueExpr(
                     undefines = proto.loadErrorValue.undefines,
                     type = mapType(proto.loadErrorValue.type),
@@ -338,7 +368,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.LOAD_LITERAL -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "load_literal", location.line),
+                op = op,
+                fallbackName = "load_literal",
                 expr = PIRLiteralExpr(
                     literal = mapLiteralValue(proto.loadLiteral.value, mapType(proto.loadLiteral.type)),
                     type = mapType(proto.loadLiteral.type),
@@ -348,7 +379,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.GET_ATTR -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "get_attr", location.line),
+                op = op,
+                fallbackName = "get_attr",
                 expr = PIRGetAttrExpr(
                     obj = mapValue(proto.getAttr.obj),
                     attr = proto.getAttr.attr,
@@ -377,7 +409,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.LOAD_STATIC -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "load_static", location.line),
+                op = op,
+                fallbackName = "load_static",
                 expr = PIRLoadStaticExpr(
                     identifier = proto.loadStatic.identifier,
                     moduleName = proto.loadStatic.moduleName.takeIf { it.isNotBlank() },
@@ -401,7 +434,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.TUPLE_SET -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "tuple_set", location.line),
+                op = op,
+                fallbackName = "tuple_set",
                 expr = PIRTupleExpr(
                     items = proto.tupleSet.itemsList.map(::mapValue),
                     type = mapType(proto.tupleSet.type),
@@ -411,7 +445,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.TUPLE_GET -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "tuple_get", location.line),
+                op = op,
+                fallbackName = "tuple_get",
                 expr = PIRTupleGetExpr(
                     tuple = mapValue(proto.tupleGet.src),
                     index = proto.tupleGet.index,
@@ -423,7 +458,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.CAST -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "cast", location.line),
+                op = op,
+                fallbackName = "cast",
                 expr = PIRCastExpr(
                     operand = mapValue(proto.cast.src),
                     unchecked = proto.cast.isUnchecked,
@@ -436,7 +472,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.BOX -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "box", location.line),
+                op = op,
+                fallbackName = "box",
                 expr = PIRBoxExpr(
                     operand = mapValue(proto.box.src),
                     type = mapType(proto.box.type),
@@ -447,7 +484,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.UNBOX -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "unbox", location.line),
+                op = op,
+                fallbackName = "unbox",
                 expr = PIRUnboxExpr(
                     operand = mapValue(proto.unbox.src),
                     type = mapType(proto.unbox.type),
@@ -474,7 +512,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.CALL_C -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "call_c", location.line),
+                op = op,
+                fallbackName = "call_c",
                 expr = PIRCallCExpr(
                     functionName = proto.callC.functionName,
                     args = proto.callC.argsList.map(::mapValue),
@@ -492,7 +531,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.TRUNCATE -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "truncate", location.line),
+                op = op,
+                fallbackName = "truncate",
                 expr = PIRCastExpr(
                     operand = mapValue(proto.truncate.src),
                     unchecked = false,
@@ -503,7 +543,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.EXTEND -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "extend", location.line),
+                op = op,
+                fallbackName = "extend",
                 expr = PIRCastExpr(
                     operand = mapValue(proto.extend.src),
                     unchecked = false,
@@ -514,7 +555,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.LOAD_GLOBAL -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "load_global", location.line),
+                op = op,
+                fallbackName = "load_global",
                 expr = PIRLoadGlobalExpr(
                     identifier = proto.loadGlobal.identifier,
                     ann = proto.loadGlobal.ann,
@@ -525,7 +567,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.INT_OP -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "int_op", location.line),
+                op = op,
+                fallbackName = "int_op",
                 expr = PIRIntBinExpr(
                     lhs = mapValue(proto.intOp.lhs),
                     rhs = mapValue(proto.intOp.rhs),
@@ -537,7 +580,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.COMPARISON_OP -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "comparison_op", location.line),
+                op = op,
+                fallbackName = "comparison_op",
                 expr = PIRCmpExpr(
                     lhs = mapValue(proto.comparisonOp.lhs),
                     rhs = mapValue(proto.comparisonOp.rhs),
@@ -549,7 +593,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.FLOAT_OP -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "float_op", location.line),
+                op = op,
+                fallbackName = "float_op",
                 expr = PIRFloatBinExpr(
                     lhs = mapValue(proto.floatOp.lhs),
                     rhs = mapValue(proto.floatOp.rhs),
@@ -561,7 +606,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.FLOAT_NEG -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "float_neg", location.line),
+                op = op,
+                fallbackName = "float_neg",
                 expr = PIRFloatNegExpr(
                     operand = mapValue(proto.floatNeg.src),
                     type = mapType(proto.floatNeg.type),
@@ -571,7 +617,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.FLOAT_COMPARISON_OP -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "float_cmp", location.line),
+                op = op,
+                fallbackName = "float_cmp",
                 expr = PIRCmpExpr(
                     lhs = mapValue(proto.floatComparisonOp.lhs),
                     rhs = mapValue(proto.floatComparisonOp.rhs),
@@ -583,7 +630,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.LOAD_MEM -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "load_mem", location.line),
+                op = op,
+                fallbackName = "load_mem",
                 expr = PIRLoadMemExpr(
                     address = mapValue(proto.loadMem.src),
                     type = mapType(proto.loadMem.type),
@@ -594,7 +642,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.GET_ELEMENT_PTR -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "get_element_ptr", location.line),
+                op = op,
+                fallbackName = "get_element_ptr",
                 expr = PIRGetElementPtrExpr(
                     src = mapValue(proto.getElementPtr.src),
                     srcType = mapPrimitiveEmbedded(proto.getElementPtr.srcType, "gep_src"),
@@ -616,7 +665,8 @@ class ProtoToPirMapper {
 
             RegisterOp.RegisterOpCase.LOAD_ADDRESS -> assignExpr(
                 location = location,
-                result = resultRegisterOf(op, "load_address", location.line),
+                op = op,
+                fallbackName = "load_address",
                 expr = PIRLoadAddressExpr(
                     target = when (proto.loadAddress.srcTypeCase) {
                         LoadAddress.SrcTypeCase.STR_SRC -> proto.loadAddress.strSrc
@@ -663,9 +713,12 @@ class ProtoToPirMapper {
 
     private fun assignExpr(
         location: PIRInstLocation,
-        result: PIRRegister,
+        op: Op,
+        fallbackName: String,
         expr: PIRExpr
     ): PIRAssignInst {
+        val result = resultRegisterOf(op, fallbackName, location.line)
+        recordSyntheticResult(op, fallbackName, result)
         return PIRAssignInst(
             location = location,
             lhv = result,
@@ -704,7 +757,7 @@ class ProtoToPirMapper {
                 isBorrowed = proto.isBorrowed
             )
 
-            ir.Value.ValueCase.OP -> resultRegisterOf(
+            ir.Value.ValueCase.OP -> referencedResultRegisterOf(
                 proto.op,
                 fallbackNameForOp(proto.op.name),
                 proto.line
@@ -1047,13 +1100,94 @@ class ProtoToPirMapper {
         }
 
         return syntheticResultCache.getOrPut(op) {
+            val baseName = if (op.name.isNotBlank()) "__${op.name}_${fallbackName}" else "__tmp_$fallbackName"
             PIRRegister(
-                name = if (op.name.isNotBlank()) "__${op.name}_${fallbackName}" else "__tmp_$fallbackName",
+                name = uniqueSyntheticName(baseName),
                 type = if (op.hasValue()) mapType(op.value.type) else PIRPrimitiveTypes.OBJECT,
                 line = line,
                 isBorrowed = op.hasValue() && op.value.isBorrowed,
                 isArg = false
             )
+        }
+    }
+
+    private fun recordSyntheticResult(op: Op, fallbackName: String, result: PIRRegister) {
+        if (op.hasValue() && op.value.valueCase == ir.Value.ValueCase.REGISTER) {
+            return
+        }
+        val exactHistory = exactSyntheticResultHistory.getOrPut(exactSyntheticHistoryKey(op)) { mutableListOf() }
+        if (exactHistory.lastOrNull() !== result) {
+            exactHistory.add(result)
+        }
+        val history = syntheticResultHistory.getOrPut(syntheticHistoryKey(op, fallbackName)) { mutableListOf() }
+        if (history.lastOrNull() !== result) {
+            history.add(result)
+        }
+    }
+
+    private fun referencedResultRegisterOf(op: Op, fallbackName: String, line: Int): PIRRegister {
+        if (op.hasValue() && op.value.valueCase == ir.Value.ValueCase.REGISTER) {
+            return mapRegister(op.value.register)
+        }
+
+        val exactPrior = exactSyntheticResultHistory[exactSyntheticHistoryKey(op)]?.lastOrNull()
+        if (exactPrior != null) {
+            return exactPrior
+        }
+
+        val historyKey = syntheticHistoryKey(op, fallbackName)
+        val history = syntheticResultHistory[historyKey]
+        val prior = if (history.isNullOrEmpty()) {
+            null
+        } else {
+            val index = currentReferenceReadIndices.getOrDefault(historyKey, 0)
+            currentReferenceReadIndices[historyKey] = index + 1
+            val weakRefCount = currentWeakReferenceCounts.getOrPut(historyKey) {
+                countWeakOpReferences(currentReferencingOp, historyKey)
+            }
+            val startIndex = maxOf(0, history.size - maxOf(weakRefCount, 1))
+            history.getOrElse(startIndex + index) { history.last() }
+        }
+        if (prior != null) {
+            return prior
+        }
+
+        return resultRegisterOf(op, fallbackName, line)
+    }
+
+    private fun uniqueSyntheticName(baseName: String): String {
+        val nextIndex = syntheticNameCounts[baseName] ?: 0
+        syntheticNameCounts[baseName] = nextIndex + 1
+        return if (nextIndex == 0) baseName else "${baseName}_$nextIndex"
+    }
+
+    private fun syntheticHistoryKey(op: Op, fallbackName: String): String {
+        return "${op.name}|$fallbackName|${opLine(op)}"
+    }
+
+    private fun exactSyntheticHistoryKey(op: Op): String =
+        Base64.getEncoder().encodeToString(op.toByteArray())
+
+    private fun countWeakOpReferences(node: Any?, historyKey: String): Int {
+        return when (node) {
+            null -> 0
+            is ir.Value -> {
+                val self = if (node.valueCase == ir.Value.ValueCase.OP &&
+                    syntheticHistoryKey(node.op, fallbackNameForOp(node.op.name)) == historyKey
+                ) {
+                    1
+                } else {
+                    0
+                }
+                self + if (node.valueCase == ir.Value.ValueCase.OP) {
+                    countWeakOpReferences(node.op, historyKey)
+                } else {
+                    0
+                }
+            }
+            is MessageOrBuilder -> node.allFields.values.sumOf { countWeakOpReferences(it, historyKey) }
+            is Iterable<*> -> node.sumOf { countWeakOpReferences(it, historyKey) }
+            else -> 0
         }
     }
 

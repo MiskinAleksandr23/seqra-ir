@@ -1,0 +1,6 @@
+{
+  "description": "While loop that accumulates recursive helper results",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [5]
+}

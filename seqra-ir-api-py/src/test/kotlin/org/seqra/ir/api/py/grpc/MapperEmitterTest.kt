@@ -397,6 +397,260 @@ class MapperEmitterTest {
     }
 
     @Test
+    fun `emits direct semantics for tagged remainder call c`() {
+        val intType = RType.newBuilder()
+            .setName("builtins.int")
+            .setRprimitive(RPrimitive.newBuilder().build())
+            .build()
+        val shortIntType = RType.newBuilder()
+            .setName("short_int")
+            .setIsUnboxed(true)
+            .setCUndefined("CPY_INT_TAG")
+            .setCtype("CPyTagged")
+            .setRprimitive(RPrimitive.newBuilder().build())
+            .build()
+
+        val x = Register.newBuilder()
+            .setName("x")
+            .setType(intType)
+            .setIsArg(true)
+            .build()
+
+        val tmp = Register.newBuilder()
+            .setName("tmp")
+            .setType(intType)
+            .build()
+
+        val callCOp = Op.newBuilder()
+            .setName("call_c")
+            .setValue(
+                Value.newBuilder()
+                    .setType(intType)
+                    .setRegister(tmp)
+                    .build()
+            )
+            .setRegisterOp(
+                RegisterOp.newBuilder()
+                    .setCallC(
+                        CallC.newBuilder()
+                            .setFunctionName("CPyTagged_Remainder")
+                            .addArgs(Value.newBuilder().setType(intType).setRegister(x).build())
+                            .addArgs(
+                                Value.newBuilder()
+                                    .setType(shortIntType)
+                                    .setInteger(
+                                        Integer.newBuilder()
+                                            .setValue(4)
+                                            .setType(shortIntType)
+                                            .build()
+                                    )
+                                    .build()
+                            )
+                            .setType(intType)
+                            .build()
+                    )
+                    .build()
+            )
+            .build()
+
+        val returnOp = Op.newBuilder()
+            .setName("return")
+            .setControlOp(
+                ControlOp.newBuilder()
+                    .setReturn(
+                        Return.newBuilder()
+                            .setValue(
+                                Value.newBuilder()
+                                    .setType(intType)
+                                    .setRegister(tmp)
+                                    .build()
+                            )
+                            .build()
+                    )
+                    .build()
+            )
+            .build()
+
+        val response = CompleteResponse.newBuilder()
+            .setSuccess(true)
+            .setModules(
+                ModuleResponse.newBuilder()
+                    .setSuccess(true)
+                    .addModules(
+                        ir.Module.newBuilder()
+                            .setFullname("sample")
+                            .addFunctions(
+                                ir.Function.newBuilder()
+                                    .setDecl(
+                                        FuncDecl.newBuilder()
+                                            .setName("mod2")
+                                            .setModuleName("sample")
+                                            .setKind(FunctionKind.FUNC_NORMAL)
+                                            .setSig(
+                                                FuncSignature.newBuilder()
+                                                    .addArgs(intType)
+                                                    .setRetType(intType)
+                                                    .build()
+                                            )
+                                            .build()
+                                    )
+                                    .addArgRegs(x)
+                                    .addBlocks(BasicBlock.newBuilder().setLabel(0).addOps(callCOp).addOps(returnOp))
+                                    .build()
+                            )
+                            .build()
+                    )
+                    .build()
+            )
+            .setClasses(ClassResponse.newBuilder().setSuccess(true).build())
+            .setCfgs(CFGResponse.newBuilder().setSuccess(true).build())
+            .build()
+
+        val emitted = PIRToPythonEmitter().emitModule(ProtoToPirMapper().mapComplete(response).single())
+
+        assertTrue(emitted.contains("tmp = (x % 2)"))
+    }
+
+    @Test
+    fun `emits direct semantics for tagged rshift call c`() {
+        val intType = RType.newBuilder()
+            .setName("builtins.int")
+            .setRprimitive(RPrimitive.newBuilder().build())
+            .build()
+        val shortIntType = RType.newBuilder()
+            .setName("short_int")
+            .setIsUnboxed(true)
+            .setCUndefined("CPY_INT_TAG")
+            .setCtype("CPyTagged")
+            .setRprimitive(RPrimitive.newBuilder().build())
+            .build()
+
+        val x = Register.newBuilder()
+            .setName("x")
+            .setType(intType)
+            .setIsArg(true)
+            .build()
+
+        val tmp = Register.newBuilder()
+            .setName("tmp")
+            .setType(intType)
+            .build()
+
+        val callCOp = Op.newBuilder()
+            .setName("call_c")
+            .setValue(
+                Value.newBuilder()
+                    .setType(intType)
+                    .setRegister(tmp)
+                    .build()
+            )
+            .setRegisterOp(
+                RegisterOp.newBuilder()
+                    .setCallC(
+                        CallC.newBuilder()
+                            .setFunctionName("CPyTagged_Rshift")
+                            .addArgs(Value.newBuilder().setType(intType).setRegister(x).build())
+                            .addArgs(
+                                Value.newBuilder()
+                                    .setType(shortIntType)
+                                    .setInteger(
+                                        Integer.newBuilder()
+                                            .setValue(2)
+                                            .setType(shortIntType)
+                                            .build()
+                                    )
+                                    .build()
+                            )
+                            .setType(intType)
+                            .build()
+                    )
+                    .build()
+            )
+            .build()
+
+        val returnOp = Op.newBuilder()
+            .setName("return")
+            .setControlOp(
+                ControlOp.newBuilder()
+                    .setReturn(
+                        Return.newBuilder()
+                            .setValue(
+                                Value.newBuilder()
+                                    .setType(intType)
+                                    .setRegister(tmp)
+                                    .build()
+                            )
+                            .build()
+                    )
+                    .build()
+            )
+            .build()
+
+        val response = CompleteResponse.newBuilder()
+            .setSuccess(true)
+            .setModules(
+                ModuleResponse.newBuilder()
+                    .setSuccess(true)
+                    .addModules(
+                        ir.Module.newBuilder()
+                            .setFullname("sample")
+                            .addFunctions(
+                                ir.Function.newBuilder()
+                                    .setDecl(
+                                        FuncDecl.newBuilder()
+                                            .setName("half")
+                                            .setModuleName("sample")
+                                            .setKind(FunctionKind.FUNC_NORMAL)
+                                            .setSig(
+                                                FuncSignature.newBuilder()
+                                                    .addArgs(intType)
+                                                    .setRetType(intType)
+                                                    .build()
+                                            )
+                                            .build()
+                                    )
+                                    .addArgRegs(x)
+                                    .addBlocks(BasicBlock.newBuilder().setLabel(0).addOps(callCOp).addOps(returnOp))
+                                    .build()
+                            )
+                            .build()
+                    )
+                    .build()
+            )
+            .setClasses(ClassResponse.newBuilder().setSuccess(true).build())
+            .setCfgs(CFGResponse.newBuilder().setSuccess(true).build())
+            .build()
+
+        val emitted = PIRToPythonEmitter().emitModule(ProtoToPirMapper().mapComplete(response).single())
+
+        assertTrue(emitted.contains("tmp = (x >> 1)"))
+    }
+
+    @Test
+    fun `emits direct semantics for tagged subtract and multiply call c`() {
+        val subtract = emitSingleCallC("CPyTagged_Subtract", encodedImmediate = 6)
+        val multiply = emitSingleCallC("CPyTagged_Multiply", encodedImmediate = 4)
+        val divide = emitSingleCallC("CPyTagged_TrueDivide", encodedImmediate = 6)
+
+        assertTrue(subtract.contains("tmp = (x - 3)"))
+        assertTrue(multiply.contains("tmp = (x * 2)"))
+        assertTrue(divide.contains("tmp = (x / 3)"))
+    }
+
+    @Test
+    fun `emits direct semantics for python number call c ops`() {
+        val add = emitSingleCallC("PyNumber_Add", encodedImmediate = 6)
+        val subtract = emitSingleCallC("PyNumber_Subtract", encodedImmediate = 6)
+        val multiply = emitSingleCallC("PyNumber_Multiply", encodedImmediate = 6)
+        val divide = emitSingleCallC("PyNumber_TrueDivide", encodedImmediate = 6)
+
+        assertTrue(add.contains("tmp = (x + 3)"))
+        assertTrue(subtract.contains("tmp = (x - 3)"))
+        assertTrue(multiply.contains("tmp = (x * 3)"))
+        assertTrue(divide.contains("tmp = (x / 3)"))
+    }
+
+    @Test
     fun `emits direct semantics for int gt primitive`() {
         val intType = RType.newBuilder()
             .setName("builtins.int")
@@ -529,6 +783,136 @@ class MapperEmitterTest {
         val emitted = PIRToPythonEmitter().emitModule(module)
 
         assertTrue(emitted.contains("tmp = (x > 5)"))
+    }
+
+    @Test
+    fun `emits direct semantics for supported int comparison primitives`() {
+        assertTrue(emitSinglePrimitive("int_eq", encodedImmediate = 10).contains("tmp = (x == 5)"))
+        assertTrue(emitSinglePrimitive("int_ne", encodedImmediate = 10).contains("tmp = (x != 5)"))
+        assertTrue(emitSinglePrimitive("int_lt", encodedImmediate = 10).contains("tmp = (x < 5)"))
+        assertTrue(emitSinglePrimitive("int_le", encodedImmediate = 10).contains("tmp = (x <= 5)"))
+        assertTrue(emitSinglePrimitive("int_gt", encodedImmediate = 10).contains("tmp = (x > 5)"))
+        assertTrue(emitSinglePrimitive("int_ge", encodedImmediate = 10).contains("tmp = (x >= 5)"))
+    }
+
+    @Test
+    fun `mapper assigns unique synthetic names to repeated call c ops`() {
+        val intType = RType.newBuilder()
+            .setName("builtins.int")
+            .setRprimitive(RPrimitive.newBuilder().build())
+            .build()
+        val shortIntType = RType.newBuilder()
+            .setName("short_int")
+            .setIsUnboxed(true)
+            .setCUndefined("CPY_INT_TAG")
+            .setCtype("CPyTagged")
+            .setRprimitive(RPrimitive.newBuilder().build())
+            .build()
+
+        val x = Register.newBuilder()
+            .setName("x")
+            .setType(intType)
+            .setIsArg(true)
+            .build()
+
+        fun taggedInt(value: Int): Value =
+            Value.newBuilder()
+                .setType(shortIntType)
+                .setInteger(
+                    Integer.newBuilder()
+                        .setValue(value.toLong())
+                        .setType(shortIntType)
+                        .build()
+                )
+                .build()
+
+        fun callCOp(encodedInt: Int): Op =
+            Op.newBuilder()
+                .setName("CallC")
+                .setValue(
+                    Value.newBuilder()
+                        .setType(intType)
+                        .build()
+                )
+                .setRegisterOp(
+                    RegisterOp.newBuilder()
+                        .setCallC(
+                            CallC.newBuilder()
+                                .setFunctionName("CPyTagged_Add")
+                                .addArgs(Value.newBuilder().setType(intType).setRegister(x).build())
+                                .addArgs(taggedInt(encodedInt))
+                                .setType(intType)
+                                .build()
+                        )
+                        .build()
+                )
+                .build()
+
+        val returnOp = Op.newBuilder()
+            .setName("return")
+            .setControlOp(
+                ControlOp.newBuilder()
+                    .setReturn(
+                        Return.newBuilder()
+                            .setValue(Value.newBuilder().setType(intType).setRegister(x).build())
+                            .build()
+                    )
+                    .build()
+            )
+            .build()
+
+        val module = ProtoToPirMapper().mapComplete(
+            CompleteResponse.newBuilder()
+                .setSuccess(true)
+                .setModules(
+                    ModuleResponse.newBuilder()
+                        .setSuccess(true)
+                        .addModules(
+                            ir.Module.newBuilder()
+                                .setFullname("sample")
+                                .addFunctions(
+                                    ir.Function.newBuilder()
+                                        .setDecl(
+                                            FuncDecl.newBuilder()
+                                                .setName("f")
+                                                .setModuleName("sample")
+                                                .setKind(FunctionKind.FUNC_NORMAL)
+                                                .setSig(
+                                                    FuncSignature.newBuilder()
+                                                        .addArgs(intType)
+                                                        .setRetType(intType)
+                                                        .build()
+                                                )
+                                                .build()
+                                        )
+                                        .addArgRegs(x)
+                                        .addBlocks(
+                                            BasicBlock.newBuilder()
+                                                .setLabel(0)
+                                                .addOps(callCOp(2))
+                                                .addOps(callCOp(4))
+                                                .addOps(returnOp)
+                                        )
+                                        .build()
+                                )
+                                .build()
+                        )
+                        .build()
+                )
+                .setClasses(ClassResponse.newBuilder().setSuccess(true).build())
+                .setCfgs(CFGResponse.newBuilder().setSuccess(true).build())
+                .build()
+        ).single()
+
+        val instructions = module.functions.single().instructions
+        val first = instructions[0] as PIRAssignInst
+        val second = instructions[1] as PIRAssignInst
+        val firstRegister = first.lhv as PIRRegister
+        val secondRegister = second.lhv as PIRRegister
+
+        assertEquals("__CallC_call_c", firstRegister.name)
+        assertEquals("__CallC_call_c_1", secondRegister.name)
+        assertFalse(firstRegister.name == secondRegister.name)
     }
 
     @Test
@@ -969,6 +1353,249 @@ class MapperEmitterTest {
         )
         holder.func = func
         return func
+    }
+
+    private fun emitSingleCallC(functionName: String, encodedImmediate: Int): String {
+        val intType = RType.newBuilder()
+            .setName("builtins.int")
+            .setRprimitive(RPrimitive.newBuilder().build())
+            .build()
+        val shortIntType = RType.newBuilder()
+            .setName("short_int")
+            .setIsUnboxed(true)
+            .setCUndefined("CPY_INT_TAG")
+            .setCtype("CPyTagged")
+            .setRprimitive(RPrimitive.newBuilder().build())
+            .build()
+
+        val x = Register.newBuilder()
+            .setName("x")
+            .setType(intType)
+            .setIsArg(true)
+            .build()
+
+        val tmp = Register.newBuilder()
+            .setName("tmp")
+            .setType(intType)
+            .build()
+
+        val callCOp = Op.newBuilder()
+            .setName("call_c")
+            .setValue(
+                Value.newBuilder()
+                    .setType(intType)
+                    .setRegister(tmp)
+                    .build()
+            )
+            .setRegisterOp(
+                RegisterOp.newBuilder()
+                    .setCallC(
+                        CallC.newBuilder()
+                            .setFunctionName(functionName)
+                            .addArgs(Value.newBuilder().setType(intType).setRegister(x).build())
+                            .addArgs(
+                                Value.newBuilder()
+                                    .setType(shortIntType)
+                                    .setInteger(
+                                        Integer.newBuilder()
+                                            .setValue(encodedImmediate.toLong())
+                                            .setType(shortIntType)
+                                            .build()
+                                    )
+                                    .build()
+                            )
+                            .setType(intType)
+                            .build()
+                    )
+                    .build()
+            )
+            .build()
+
+        val returnOp = Op.newBuilder()
+            .setName("return")
+            .setControlOp(
+                ControlOp.newBuilder()
+                    .setReturn(
+                        Return.newBuilder()
+                            .setValue(
+                                Value.newBuilder()
+                                    .setType(intType)
+                                    .setRegister(tmp)
+                                    .build()
+                            )
+                            .build()
+                    )
+                    .build()
+            )
+            .build()
+
+        val response = CompleteResponse.newBuilder()
+            .setSuccess(true)
+            .setModules(
+                ModuleResponse.newBuilder()
+                    .setSuccess(true)
+                    .addModules(
+                        ir.Module.newBuilder()
+                            .setFullname("sample")
+                            .addFunctions(
+                                ir.Function.newBuilder()
+                                    .setDecl(
+                                        FuncDecl.newBuilder()
+                                            .setName("f")
+                                            .setModuleName("sample")
+                                            .setKind(FunctionKind.FUNC_NORMAL)
+                                            .setSig(
+                                                FuncSignature.newBuilder()
+                                                    .addArgs(intType)
+                                                    .setRetType(intType)
+                                                    .build()
+                                            )
+                                            .build()
+                                    )
+                                    .addArgRegs(x)
+                                    .addBlocks(BasicBlock.newBuilder().setLabel(0).addOps(callCOp).addOps(returnOp))
+                                    .build()
+                            )
+                            .build()
+                    )
+                    .build()
+            )
+            .setClasses(ClassResponse.newBuilder().setSuccess(true).build())
+            .setCfgs(CFGResponse.newBuilder().setSuccess(true).build())
+            .build()
+
+        return PIRToPythonEmitter().emitModule(ProtoToPirMapper().mapComplete(response).single())
+    }
+
+    private fun emitSinglePrimitive(name: String, encodedImmediate: Int): String {
+        val intType = RType.newBuilder()
+            .setName("builtins.int")
+            .setRprimitive(RPrimitive.newBuilder().build())
+            .build()
+        val shortIntType = RType.newBuilder()
+            .setName("short_int")
+            .setIsUnboxed(true)
+            .setCUndefined("CPY_INT_TAG")
+            .setCtype("CPyTagged")
+            .setRprimitive(RPrimitive.newBuilder().build())
+            .build()
+        val bitType = RType.newBuilder()
+            .setName("bit")
+            .setIsUnboxed(true)
+            .setCUndefined("2")
+            .setCtype("char")
+            .setRprimitive(
+                RPrimitive.newBuilder()
+                    .setSize(1)
+                    .setMayBeImmortal(true)
+                    .build()
+            )
+            .build()
+
+        val x = Register.newBuilder()
+            .setName("x")
+            .setType(intType)
+            .setIsArg(true)
+            .build()
+
+        val tmp = Register.newBuilder()
+            .setName("tmp")
+            .setType(bitType)
+            .build()
+
+        val primitiveOp = Op.newBuilder()
+            .setName("primitive_op")
+            .setValue(
+                Value.newBuilder()
+                    .setType(bitType)
+                    .setRegister(tmp)
+                    .build()
+            )
+            .setRegisterOp(
+                RegisterOp.newBuilder()
+                    .setPrimitiveOp(
+                        PrimitiveOp.newBuilder()
+                            .addArgs(Value.newBuilder().setType(intType).setRegister(x).build())
+                            .addArgs(
+                                Value.newBuilder()
+                                    .setType(shortIntType)
+                                    .setInteger(
+                                        Integer.newBuilder()
+                                            .setValue(encodedImmediate.toLong())
+                                            .setType(shortIntType)
+                                            .build()
+                                    )
+                                    .build()
+                            )
+                            .setType(bitType)
+                            .setDesc(
+                                PrimitiveDescription.newBuilder()
+                                    .setName(name)
+                                    .setReturnType(bitType)
+                                    .build()
+                            )
+                            .build()
+                    )
+                    .build()
+            )
+            .build()
+
+        val returnOp = Op.newBuilder()
+            .setName("return")
+            .setControlOp(
+                ControlOp.newBuilder()
+                    .setReturn(
+                        Return.newBuilder()
+                            .setValue(
+                                Value.newBuilder()
+                                    .setType(bitType)
+                                    .setRegister(tmp)
+                                    .build()
+                            )
+                            .build()
+                    )
+                    .build()
+            )
+            .build()
+
+        val module = ProtoToPirMapper().mapComplete(
+            CompleteResponse.newBuilder()
+                .setSuccess(true)
+                .setModules(
+                    ModuleResponse.newBuilder()
+                        .setSuccess(true)
+                        .addModules(
+                            ir.Module.newBuilder()
+                                .setFullname("sample")
+                                .addFunctions(
+                                    ir.Function.newBuilder()
+                                        .setDecl(
+                                            FuncDecl.newBuilder()
+                                                .setName("cmp")
+                                                .setModuleName("sample")
+                                                .setKind(FunctionKind.FUNC_NORMAL)
+                                                .setSig(
+                                                    FuncSignature.newBuilder()
+                                                        .addArgs(intType)
+                                                        .setRetType(bitType)
+                                                        .build()
+                                                )
+                                                .build()
+                                        )
+                                        .addArgRegs(x)
+                                        .addBlocks(BasicBlock.newBuilder().setLabel(0).addOps(primitiveOp).addOps(returnOp))
+                                        .build()
+                                )
+                                .build()
+                        )
+                        .build()
+                )
+                .setClasses(ClassResponse.newBuilder().setSuccess(true).build())
+                .setCfgs(CFGResponse.newBuilder().setSuccess(true).build())
+                .build()
+        ).single()
+
+        return PIRToPythonEmitter().emitModule(module)
     }
 
     private fun syntheticOwner(moduleName: String): PIRClass {

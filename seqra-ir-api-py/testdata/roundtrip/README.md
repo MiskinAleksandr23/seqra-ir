@@ -29,7 +29,21 @@ python seqra-ir-api-py/scripts/run_roundtrip_examples.py
 - `continue`
 - `break`
 - `for range`
+- `for range` с floor division в теле
+- `for range` с отрицательным шагом
+- `for range` с multiply/subtract обновлениями
+- `for ... else`
 - nested `while`
 - `for range` c `break/continue`
 - `while` с несколькими обновляемыми переменными
 - `while` с межмодульным вызовом в теле
+- `while` с modulo-фильтрацией
+- `while ... else`
+- `while` с float accumulation через true division
+- nested search loops с межмодульным вызовом и ранним выходом
+- рекурсивные self-calls на одном модуле
+- взаимную рекурсию
+- простой DFS по неявному дереву
+- цикл с рекурсивным helper
+- `range` с положительным шагом больше 1
+- линейную рекурсию-суммирование

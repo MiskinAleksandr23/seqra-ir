@@ -1,0 +1,6 @@
+{
+  "description": "Simple linear recursion for sum from 1 to n",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [6]
+}

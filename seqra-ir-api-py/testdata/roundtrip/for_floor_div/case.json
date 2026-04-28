@@ -1,0 +1,6 @@
+{
+  "description": "For-range accumulation with floor division in the loop body",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [6]
+}
