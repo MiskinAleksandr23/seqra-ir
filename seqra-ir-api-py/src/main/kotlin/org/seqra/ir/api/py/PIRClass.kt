@@ -1,20 +1,10 @@
 package org.seqra.ir.api.py
 
-import org.seqra.ir.api.py.cfg.*
-import java.util.Collections.*
-
 data class PIRVTableMethod(
     val cls: PIRClass,
     val name: String,
     val method: PIRFunc,
     val shadowMethod: PIRFunc? = null
-)
-
-data class PIRNonExtClassInfo(
-    val dict: PIRValue,
-    val bases: PIRValue,
-    val anns: PIRValue,
-    val metaclass: PIRValue
 )
 
 data class PIRClass(
@@ -48,7 +38,7 @@ data class PIRClass(
     val traits: List<PIRClass> = emptyList(),
     val mro: List<PIRClass> = emptyList(),
     val baseMro: List<PIRClass> = emptyList(),
-    val children: List<PIRClass>? = emptyList(),
+    val children: List<PIRClass> = emptyList(),
     val attrsWithDefaults: Set<String> = emptySet(),
     val alwaysInitializedAttrs: Set<String> = emptySet(),
     val sometimesInitializedAttrs: Set<String> = emptySet(),

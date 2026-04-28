@@ -1,7 +1,5 @@
 package org.seqra.ir.api.py
 
-import java.util.Collections.*
-
 sealed class PIRDependency
 
 data class PIRCapsule(val name: String) : PIRDependency()

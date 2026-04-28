@@ -1,52 +1,44 @@
 package org.seqra.ir.api.py.cfg
 
 interface PIRExprVisitor<T> {
-    fun visitIntAdd(expr: PIRIntAddExpr): T
-    fun visitIntSub(expr: PIRIntSubExpr): T
-    fun visitIntMul(expr: PIRIntMulExpr): T
-    fun visitIntDiv(expr: PIRIntDivExpr): T
-    fun visitIntMod(expr: PIRIntModExpr): T
-    fun visitIntAnd(expr: PIRIntAndExpr): T
-    fun visitIntOr(expr: PIRIntOrExpr): T
-    fun visitIntXor(expr: PIRIntXorExpr): T
-    fun visitIntShl(expr: PIRIntShlExpr): T
-    fun visitIntShr(expr: PIRIntShrExpr): T
-    fun visitIntEq(expr: PIRIntEqExpr): T
-    fun visitIntNe(expr: PIRIntNeExpr): T
-    fun visitIntLt(expr: PIRIntLtExpr): T
-    fun visitIntLe(expr: PIRIntLeExpr): T
-    fun visitIntGt(expr: PIRIntGtExpr): T
-    fun visitIntGe(expr: PIRIntGeExpr): T
-    fun visitFloatEq(expr: PIRFloatEqExpr): T
-    fun visitFloatNe(expr: PIRFloatNeExpr): T
-    fun visitIntNeg(expr: PIRIntNegExpr): T
-    fun visitFloatNeg(expr: PIRFloatNegExpr): T
-    fun visitNot(expr: PIRNotExpr): T
-    fun visitCast(expr: PIRCastExpr): T
-    fun visitBox(expr: PIRBoxExpr): T
-    fun visitUnbox(expr: PIRUnboxExpr): T
-    fun visitGetAttr(expr: PIRGetAttrExpr): T
-    fun visitGetElement(expr: PIRGetElementExpr): T
-    fun visitTupleGet(expr: PIRTupleGetExpr): T
-    fun visitLoadMem(expr: PIRLoadMemExpr): T
-    fun visitLoadAddress(expr: PIRLoadAddressExpr): T
-    fun visitLoadStatic(expr: PIRLoadStaticExpr): T
-    fun visitLoadGlobal(expr: PIRLoadGlobalExpr): T
-    fun visitLoadLiteral(expr: PIRLoadLiteralExpr): T
-    fun visitLoadErrorValue(expr: PIRLoadErrorValueExpr): T
-    fun visitPhi(expr: PIRPhiExpr): T
+    fun visitRegister(value: PIRRegister): T
+    fun visitInteger(value: PIRInteger): T
+    fun visitFloat(value: PIRFloat): T
+    fun visitCString(value: PIRCString): T
+    fun visitUndef(value: PIRUndef): T
+    fun visitArgument(value: PIRArgument): T
+
+    fun visitMove(expr: PIRMoveExpr): T
+    fun visitLoadLiteral(expr: PIRLiteralExpr): T
     fun visitDirectCall(expr: PIRDirectCallExpr): T
     fun visitMethodCall(expr: PIRMethodCallExpr): T
     fun visitPrimitiveCall(expr: PIRPrimitiveCallExpr): T
-    fun visitCCall(expr: PIRCCallExpr): T
+    fun visitCCall(expr: PIRCallCExpr): T
+    fun visitLoadErrorValue(expr: PIRLoadErrorValueExpr): T
+    fun visitGetAttr(expr: PIRGetAttrExpr): T
+    fun visitLoadStatic(expr: PIRLoadStaticExpr): T
+    fun visitTuple(expr: PIRTupleExpr): T
+    fun visitTupleGet(expr: PIRTupleGetExpr): T
+    fun visitCast(expr: PIRCastExpr): T
+    fun visitBox(expr: PIRBoxExpr): T
+    fun visitUnbox(expr: PIRUnboxExpr): T
+    fun visitIntBin(expr: PIRIntBinExpr): T
+    fun visitCmp(expr: PIRCmpExpr): T
+    fun visitFloatBin(expr: PIRFloatBinExpr): T
+    fun visitFloatNeg(expr: PIRFloatNegExpr): T
+    fun visitLoadMem(expr: PIRLoadMemExpr): T
+    fun visitGetElementPtr(expr: PIRGetElementPtrExpr): T
+    fun visitLoadAddress(expr: PIRLoadAddressExpr): T
+    fun visitLoadGlobal(expr: PIRLoadGlobalExpr): T
+    fun visitPhi(expr: PIRPhiExpr): T
 
-    fun visitRegister(expr: PIRRegister): T
-    fun visitInteger(expr: PIRInteger): T
-    fun visitFloat(expr: PIRFloat): T
-    fun visitCString(expr: PIRCString): T
-    fun visitUndef(expr: PIRUndef): T
-    fun visitThis(expr: PIRThis): T
-    fun visitArgument(expr: PIRArgument): T
-    fun visitFieldRef(expr: PIRFieldRef): T
-    fun visitArrayAccess(expr: PIRArrayAccess): T
+    fun visitSetAttr(expr: PIRSetAttrExpr): T
+    fun visitInitStatic(expr: PIRInitStaticExpr): T
+    fun visitSetMem(expr: PIRSetMemExpr): T
+    fun visitSetElement(expr: PIRSetElementExpr): T
+    fun visitKeepAlive(expr: PIRKeepAliveExpr): T
+    fun visitIncRef(expr: PIRIncRefExpr): T
+    fun visitDecRef(expr: PIRDecRefExpr): T
+    fun visitUnborrow(expr: PIRUnborrowExpr): T
+    fun visitRaiseStandardError(expr: PIRRaiseStandardErrorExpr): T
 }

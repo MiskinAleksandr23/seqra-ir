@@ -7,14 +7,15 @@ data class PIRInstRef(
     val inst: PIRInst? = null
 )
 
-data class PIRBasicBlock(val start: PIRInstRef, val end: PIRInstRef) {
-    operator fun contains(inst: PIRInst): Boolean {
-        return inst.location.index <= end.index && inst.location.index >= start.index
-    }
+data class PIRBasicBlock(
+    val start: PIRInstRef,
+    val end: PIRInstRef
+) {
+    operator fun contains(inst: PIRInst): Boolean =
+        inst.location.index in start.index..end.index
 
-    operator fun contains(inst: PIRInstRef): Boolean {
-        return inst.index <= end.index && inst.index >= start.index
-    }
+    operator fun contains(inst: PIRInstRef): Boolean =
+        inst.index in start.index..end.index
 }
 
 interface PIRBlockGraph : PIRBytecodeGraph<PIRBasicBlock> {

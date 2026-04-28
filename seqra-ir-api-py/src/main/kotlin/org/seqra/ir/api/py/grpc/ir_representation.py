@@ -89,6 +89,10 @@ def get_modules(files: List[str] = None, dir: str = None) -> List[ModuleIR]:
     options.python_version = compiler_options.python_version or (3, 9)
     options.export_types = True
     options.preserve_asts = True
+    options.allow_empty_bodies = True
+    options.strict_bytes = True
+    options.disable_bytearray_promotion = True
+    options.disable_memoryview_promotion = True
 
     per_module_options = {}
     for i in range(len(source_files)):
@@ -129,7 +133,7 @@ def get_cfg(files: List[str] = None, dir: str = None):
             if fn.name == TOP_LEVEL_NAME:
                 continue
 
-            exceptions.insert_exception_handling(fn)
+            exceptions.insert_exception_handling(fn, True)
 
             if fn.decl.name.startswith('__'):
                 continue
@@ -184,4 +188,4 @@ def get_cfg(files: List[str] = None, dir: str = None):
 if __name__ == "__main__":
     # get_modules(["C:/MKN/project2/solution.py", "C:/MKN/project2/anysystem.py"])
     # get_classes(["C:/MKN/project2/solution.py", "C:/MKN/project2/anysystem.py"])
-    get_cfg(["C:/MKN/project2/test.py"])
+    get_cfg(["/mnt/c/MKN/project2/test.py"])

@@ -6,6 +6,8 @@ import ir.FileList
 import ir.IRServiceGrpcKt
 import ir.SourceRequest
 import kotlinx.coroutines.runBlocking
+import org.seqra.ir.api.py.emit.PIRToPythonEmitter
+import org.seqra.ir.api.py.mapper.ProtoToPirMapper
 import java.io.File
 
 fun main(): Unit = runBlocking {
@@ -25,7 +27,7 @@ fun main(): Unit = runBlocking {
         .setIncludeMetadata(true)
         .build()
 
-    val response = stub.getCFG(request)
+    val response = stub.getAll(request)
 
     val jsonString = JsonFormat.printer()
         .includingDefaultValueFields()
@@ -35,7 +37,27 @@ fun main(): Unit = runBlocking {
     File("output.json").writeText(jsonString)
 
     println("Success: ${response.success}")
-    println("CFG count: ${response.functionCfgsCount}")
+    println("Module count: ${response.modules.modulesCount}")
+    println("Class count: ${response.classes.classesCount}")
+    println("CFG count: ${response.cfgs.functionCfgsCount}")
+
+    if (!response.success) {
+        println("Errors: ${response.errorsList}")
+        channel.shutdown()
+        return@runBlocking
+    }
+
+    val mapper = ProtoToPirMapper()
+    val pirModules = mapper.mapComplete(response)
+
+    val emitter = PIRToPythonEmitter()
+
+    pirModules.forEach { module ->
+        val code = emitter.emitModule(module)
+        val fileName = module.fullname.substringAfterLast('.').replace(".", "_") + "_generated.py"
+        File(fileName).writeText(code)
+        println("Generated Python file: $fileName")
+    }
 
     channel.shutdown()
 }
