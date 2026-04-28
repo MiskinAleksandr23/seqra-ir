@@ -1,0 +1,6 @@
+{
+  "description": "Nested while loops with accumulator",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [5]
+}

@@ -596,7 +596,7 @@ class PIRToPythonEmitter(
         return when (value) {
             is PIRRegister -> pyName(value.name)
             is PIRArgument -> pyName(value.name)
-            is PIRInteger -> value.value.toString()
+            is PIRInteger -> decodeImmediateInteger(value).toString()
             is PIRFloat -> value.value.toString()
             is PIRCString -> quote(value.value.decodeToString())
             is PIRUndef -> "None"
@@ -606,14 +606,16 @@ class PIRToPythonEmitter(
 
     private fun emitTaggedValue(value: PIRValue): String {
         return when (value) {
-            is PIRInteger -> {
-                if (value.value % 2 == 0) {
-                    (value.value / 2).toString()
-                } else {
-                    value.value.toString()
-                }
-            }
+            is PIRInteger -> decodeImmediateInteger(value).toString()
             else -> emitValue(value)
+        }
+    }
+
+    private fun decodeImmediateInteger(value: PIRInteger): Int {
+        return if (value.type.name == "short_int" && value.value % 2 == 0) {
+            value.value / 2
+        } else {
+            value.value
         }
     }
 

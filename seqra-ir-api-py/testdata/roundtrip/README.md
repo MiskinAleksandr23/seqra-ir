@@ -29,3 +29,7 @@ python seqra-ir-api-py/scripts/run_roundtrip_examples.py
 - `continue`
 - `break`
 - `for range`
+- nested `while`
+- `for range` c `break/continue`
+- `while` с несколькими обновляемыми переменными
+- `while` с межмодульным вызовом в теле

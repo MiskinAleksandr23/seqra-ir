@@ -1,0 +1,6 @@
+{
+  "description": "While loop with cross-module call in the body",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [5]
+}

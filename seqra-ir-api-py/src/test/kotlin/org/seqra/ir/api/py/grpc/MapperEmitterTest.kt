@@ -287,6 +287,13 @@ class MapperEmitterTest {
             .setName("builtins.int")
             .setRprimitive(RPrimitive.newBuilder().build())
             .build()
+        val shortIntType = RType.newBuilder()
+            .setName("short_int")
+            .setIsUnboxed(true)
+            .setCUndefined("CPY_INT_TAG")
+            .setCtype("CPyTagged")
+            .setRprimitive(RPrimitive.newBuilder().build())
+            .build()
 
         val x = Register.newBuilder()
             .setName("x")
@@ -315,11 +322,11 @@ class MapperEmitterTest {
                             .addArgs(Value.newBuilder().setType(intType).setRegister(x).build())
                             .addArgs(
                                 Value.newBuilder()
-                                    .setType(intType)
+                                    .setType(shortIntType)
                                     .setInteger(
                                         Integer.newBuilder()
                                             .setValue(2)
-                                            .setType(intType)
+                                            .setType(shortIntType)
                                             .build()
                                     )
                                     .build()
@@ -395,6 +402,13 @@ class MapperEmitterTest {
             .setName("builtins.int")
             .setRprimitive(RPrimitive.newBuilder().build())
             .build()
+        val shortIntType = RType.newBuilder()
+            .setName("short_int")
+            .setIsUnboxed(true)
+            .setCUndefined("CPY_INT_TAG")
+            .setCtype("CPyTagged")
+            .setRprimitive(RPrimitive.newBuilder().build())
+            .build()
 
         val bitType = RType.newBuilder()
             .setName("bit")
@@ -435,11 +449,11 @@ class MapperEmitterTest {
                             .addArgs(Value.newBuilder().setType(intType).setRegister(x).build())
                             .addArgs(
                                 Value.newBuilder()
-                                    .setType(intType)
+                                    .setType(shortIntType)
                                     .setInteger(
                                         Integer.newBuilder()
                                             .setValue(10)
-                                            .setType(intType)
+                                            .setType(shortIntType)
                                             .build()
                                     )
                                     .build()
@@ -864,10 +878,55 @@ class MapperEmitterTest {
         assertEquals("3", runGeneratedFunction(module, "main", "[]"))
     }
 
+    @Test
+    fun `decodes short int immediate in assignments`() {
+        val shortIntType = org.seqra.ir.api.py.PIRPrimitiveType(
+            name = "short_int",
+            isUnboxed = true,
+            isRefcounted = false,
+            ctype = "CPyTagged"
+        )
+        val result = PIRRegister("result", PIRPrimitiveTypes.INT)
+
+        val function = buildSyntheticFunction(
+            moduleName = "short_sample",
+            functionName = "main",
+            argRegs = emptyList(),
+            retType = PIRPrimitiveTypes.INT,
+            blockRanges = listOf(0..1)
+        ) { methodProvider ->
+            listOf(
+                PIRAssignInst(
+                    location = loc(methodProvider, 0, 1),
+                    lhv = result,
+                    rhv = org.seqra.ir.api.py.cfg.PIRMoveExpr(
+                        value = PIRInteger(2, shortIntType),
+                        type = PIRPrimitiveTypes.INT,
+                        line = 1
+                    )
+                ),
+                PIRReturnInst(loc(methodProvider, 1, 1), result)
+            )
+        }
+
+        val module = PIRModule(
+            fullname = "short_sample",
+            imports = emptyList(),
+            functions = listOf(function),
+            classes = emptyList(),
+            finalNames = emptyList()
+        )
+
+        val emitted = PIRToPythonEmitter().emitModule(module)
+        assertTrue(emitted.contains("result = 1"))
+        assertEquals("1", runGeneratedFunction(module, "main", "[]"))
+    }
+
     private fun buildSyntheticFunction(
         moduleName: String,
         functionName: String,
         argRegs: List<PIRRegister>,
+        retType: org.seqra.ir.api.py.PIRType = PIRPrimitiveTypes.INT,
         blockRanges: List<IntRange>,
         instructionsBuilder: ((() -> PIRFunc) -> List<PIRInst>)
     ): PIRFunc {
@@ -900,7 +959,7 @@ class MapperEmitterTest {
                             kind = if (index >= 0) org.seqra.ir.api.py.ARG_POS else org.seqra.ir.api.py.ARG_POS
                         )
                     },
-                    retType = PIRPrimitiveTypes.INT
+                    retType = retType
                 )
             ),
             argRegs = argRegs,
