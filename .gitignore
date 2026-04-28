@@ -5,3 +5,5 @@ build/
 idea-community
 *.db
 /generated/
+__pycache__/
+*.pyc
