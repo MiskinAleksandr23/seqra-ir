@@ -1,0 +1,6 @@
+{
+  "description": "Three modules, nested calls, multiple comparisons and if/elif/else",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [9]
+}
