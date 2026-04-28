@@ -1,0 +1,6 @@
+{
+  "description": "While loop with counter and accumulator",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [5]
+}

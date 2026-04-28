@@ -1,15 +1,39 @@
 package org.seqra.ir.api.py.grpc
 
 import ir.*
+import org.seqra.ir.api.py.PIRClass
+import org.seqra.ir.api.py.PIRFunc
+import org.seqra.ir.api.py.PIRFuncDecl
+import org.seqra.ir.api.py.PIRFuncSignature
+import org.seqra.ir.api.py.PIRModule
+import org.seqra.ir.api.py.PIRPrimitiveTypes
+import org.seqra.ir.api.py.cfg.PIRArgument
+import org.seqra.ir.api.py.cfg.PIRAssignInst
+import org.seqra.ir.api.py.cfg.PIRBasicBlock
+import org.seqra.ir.api.py.cfg.PIRCmpExpr
+import org.seqra.ir.api.py.cfg.PIRCmpKind
+import org.seqra.ir.api.py.cfg.PIRGotoInst
+import org.seqra.ir.api.py.cfg.PIRIfInst
+import org.seqra.ir.api.py.cfg.PIRInst
+import org.seqra.ir.api.py.cfg.PIRInstLocation
+import org.seqra.ir.api.py.cfg.PIRInstRef
+import org.seqra.ir.api.py.cfg.PIRIntBinExpr
+import org.seqra.ir.api.py.cfg.PIRIntOpKind
+import org.seqra.ir.api.py.cfg.PIRInteger
+import org.seqra.ir.api.py.cfg.PIRPhiExpr
+import org.seqra.ir.api.py.cfg.PIRRegister
+import org.seqra.ir.api.py.cfg.PIRReturnInst
 import org.seqra.ir.api.py.emit.EmitMode
 import org.seqra.ir.api.py.emit.EmitOptions
 import org.seqra.ir.api.py.emit.PIRFuzzSupportChecker
 import org.seqra.ir.api.py.emit.PIRToPythonEmitter
 import org.seqra.ir.api.py.mapper.ProtoToPirMapper
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.nio.file.Files
 
 class MapperEmitterTest {
 
@@ -679,5 +703,265 @@ class MapperEmitterTest {
         ).emitModule(module)
 
         assertTrue(emitted.contains("__pir_primitive(\"unsupported_primitive\")"))
+    }
+
+    @Test
+    fun `supports phi merge semantics in fuzz mode`() {
+        val intType = PIRPrimitiveTypes.INT
+        val x = PIRRegister("x", intType, isArg = true)
+        val yThen = PIRRegister("y_then", intType)
+        val yElse = PIRRegister("y_else", intType)
+        val y = PIRRegister("y", intType)
+
+        val function = buildSyntheticFunction(
+            moduleName = "sample",
+            functionName = "main",
+            argRegs = listOf(x),
+            blockRanges = listOf(0..0, 1..2, 3..4, 5..6)
+        ) { methodProvider ->
+            listOf(
+                PIRIfInst(
+                    location = loc(methodProvider, 0, 1),
+                    condition = PIRCmpExpr(
+                        lhs = x,
+                        rhs = PIRInteger(0, intType),
+                        op = PIRCmpKind.GT,
+                        type = PIRPrimitiveTypes.BOOL,
+                        line = 1
+                    ),
+                    trueBranch = PIRInstRef(1),
+                    falseBranch = PIRInstRef(3)
+                ),
+                PIRAssignInst(
+                    location = loc(methodProvider, 1, 2),
+                    lhv = yThen,
+                    rhv = PIRIntBinExpr(
+                        lhs = x,
+                        rhs = PIRInteger(1, intType),
+                        op = PIRIntOpKind.ADD,
+                        type = intType,
+                        line = 2
+                    )
+                ),
+                PIRGotoInst(loc(methodProvider, 2, 2), PIRInstRef(5)),
+                PIRAssignInst(
+                    location = loc(methodProvider, 3, 4),
+                    lhv = yElse,
+                    rhv = PIRIntBinExpr(
+                        lhs = x,
+                        rhs = PIRInteger(2, intType),
+                        op = PIRIntOpKind.ADD,
+                        type = intType,
+                        line = 4
+                    )
+                ),
+                PIRGotoInst(loc(methodProvider, 4, 4), PIRInstRef(5)),
+                PIRAssignInst(
+                    location = loc(methodProvider, 5, 5),
+                    lhv = y,
+                    rhv = PIRPhiExpr(
+                        type = intType,
+                        values = listOf(yThen, yElse),
+                        line = 5
+                    )
+                ),
+                PIRReturnInst(loc(methodProvider, 6, 6), y)
+            )
+        }
+
+        val module = PIRModule(
+            fullname = "sample",
+            imports = emptyList(),
+            functions = listOf(function),
+            classes = emptyList(),
+            finalNames = emptyList()
+        )
+
+        val report = PIRFuzzSupportChecker.analyze(module)
+        assertTrue(report.isSupported)
+
+        val emitted = PIRToPythonEmitter().emitModule(module)
+        assertTrue(emitted.contains("__prev_pc = None"))
+        assertTrue(emitted.contains("y = (y_then if __prev_pc == 1 else (y_else if __prev_pc == 3 else __pir_bad_phi(__prev_pc, __pc)))"))
+
+        assertEquals("6", runGeneratedFunction(module, "main", "[5]"))
+        assertEquals("-3", runGeneratedFunction(module, "main", "[-5]"))
+    }
+
+    @Test
+    fun `supports phi loop header semantics in fuzz mode`() {
+        val intType = PIRPrimitiveTypes.INT
+        val init = PIRRegister("init", intType)
+        val loopValue = PIRRegister("loop_value", intType)
+        val nextValue = PIRRegister("next_value", intType)
+
+        val function = buildSyntheticFunction(
+            moduleName = "loop_sample",
+            functionName = "main",
+            argRegs = emptyList(),
+            blockRanges = listOf(0..1, 2..3, 4..5, 6..6)
+        ) { methodProvider ->
+            listOf(
+                PIRAssignInst(
+                    location = loc(methodProvider, 0, 1),
+                    lhv = init,
+                    rhv = PIRIntBinExpr(
+                        lhs = PIRInteger(0, intType),
+                        rhs = PIRInteger(0, intType),
+                        op = PIRIntOpKind.ADD,
+                        type = intType,
+                        line = 1
+                    )
+                ),
+                PIRGotoInst(loc(methodProvider, 1, 1), PIRInstRef(2)),
+                PIRAssignInst(
+                    location = loc(methodProvider, 2, 2),
+                    lhv = loopValue,
+                    rhv = PIRPhiExpr(
+                        type = intType,
+                        values = listOf(init, nextValue),
+                        line = 2
+                    )
+                ),
+                PIRIfInst(
+                    location = loc(methodProvider, 3, 2),
+                    condition = PIRCmpExpr(
+                        lhs = loopValue,
+                        rhs = PIRInteger(3, intType),
+                        op = PIRCmpKind.LT,
+                        type = PIRPrimitiveTypes.BOOL,
+                        line = 2
+                    ),
+                    trueBranch = PIRInstRef(4),
+                    falseBranch = PIRInstRef(6)
+                ),
+                PIRAssignInst(
+                    location = loc(methodProvider, 4, 3),
+                    lhv = nextValue,
+                    rhv = PIRIntBinExpr(
+                        lhs = loopValue,
+                        rhs = PIRInteger(1, intType),
+                        op = PIRIntOpKind.ADD,
+                        type = intType,
+                        line = 3
+                    )
+                ),
+                PIRGotoInst(loc(methodProvider, 5, 3), PIRInstRef(2)),
+                PIRReturnInst(loc(methodProvider, 6, 4), loopValue)
+            )
+        }
+
+        val module = PIRModule(
+            fullname = "loop_sample",
+            imports = emptyList(),
+            functions = listOf(function),
+            classes = emptyList(),
+            finalNames = emptyList()
+        )
+
+        val emitted = PIRToPythonEmitter().emitModule(module)
+        assertTrue(emitted.contains("loop_value = (init if __prev_pc == 0 else (next_value if __prev_pc == 4 else __pir_bad_phi(__prev_pc, __pc)))"))
+        assertEquals("3", runGeneratedFunction(module, "main", "[]"))
+    }
+
+    private fun buildSyntheticFunction(
+        moduleName: String,
+        functionName: String,
+        argRegs: List<PIRRegister>,
+        blockRanges: List<IntRange>,
+        instructionsBuilder: ((() -> PIRFunc) -> List<PIRInst>)
+    ): PIRFunc {
+        val owner = syntheticOwner(moduleName)
+
+        class Holder {
+            lateinit var func: PIRFunc
+        }
+
+        val holder = Holder()
+        val methodProvider = { holder.func }
+        val instructions = instructionsBuilder(methodProvider)
+        val blocks = blockRanges.map { range ->
+            PIRBasicBlock(
+                start = PIRInstRef(range.first, instructions.getOrNull(range.first)),
+                end = PIRInstRef(range.last, instructions.getOrNull(range.last))
+            )
+        }
+
+        val func = PIRFunc(
+            decl = PIRFuncDecl(
+                name = functionName,
+                className = null,
+                moduleName = moduleName,
+                sig = PIRFuncSignature(
+                    args = argRegs.mapIndexed { index, reg ->
+                        org.seqra.ir.api.py.PIRRuntimeArg(
+                            name = reg.name,
+                            type = reg.type,
+                            kind = if (index >= 0) org.seqra.ir.api.py.ARG_POS else org.seqra.ir.api.py.ARG_POS
+                        )
+                    },
+                    retType = PIRPrimitiveTypes.INT
+                )
+            ),
+            argRegs = argRegs,
+            instructions = instructions,
+            blocks = blocks,
+            enclosingClass = owner
+        )
+        holder.func = func
+        return func
+    }
+
+    private fun syntheticOwner(moduleName: String): PIRClass {
+        val dummySig = PIRFuncSignature(emptyList(), PIRPrimitiveTypes.NONE)
+        val dummyDecl = PIRFuncDecl(
+            name = "__dummy__",
+            className = null,
+            moduleName = moduleName,
+            sig = dummySig
+        )
+        return PIRClass(
+            name = "__module__",
+            moduleName = moduleName,
+            ctor = dummyDecl,
+            setup = dummyDecl
+        )
+    }
+
+    private fun loc(methodProvider: () -> PIRFunc, index: Int, line: Int): PIRInstLocation =
+        object : PIRInstLocation {
+            override val method: PIRFunc
+                get() = methodProvider()
+            override val index: Int = index
+            override val line: Int = line
+        }
+
+    private fun runGeneratedFunction(module: PIRModule, functionName: String, argsJson: String): String {
+        val tempDir = Files.createTempDirectory("pir-phi-test")
+        val moduleImportName = module.fullname.substringAfterLast('.')
+        val generatedName = "${moduleImportName}_generated"
+        val file = tempDir.resolve("$generatedName.py").toFile()
+        PIRToPythonEmitter().writeModule(module, file)
+
+        val script = """
+            import json
+            import $generatedName as generated
+            args = json.loads('$argsJson')
+            print(getattr(generated, '$functionName')(*args))
+        """.trimIndent()
+
+        val process = ProcessBuilder("python3", "-c", script)
+            .directory(tempDir.toFile())
+            .redirectErrorStream(true)
+            .apply {
+                environment()["PYTHONPATH"] = tempDir.toString()
+            }
+            .start()
+
+        val output = process.inputStream.bufferedReader().readText().trim()
+        val exitCode = process.waitFor()
+        assertEquals(0, exitCode, output)
+        assertFalse(output.contains("Traceback"), output)
+        return output
     }
 }

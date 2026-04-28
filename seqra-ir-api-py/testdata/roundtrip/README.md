@@ -19,3 +19,13 @@
 ```bash
 python seqra-ir-api-py/scripts/run_roundtrip_examples.py
 ```
+
+Сейчас corpus покрывает:
+
+- простые межмодульные вызовы
+- ветвления `if/elif/else`
+- несколько модулей с вложенными вызовами
+- `while`
+- `continue`
+- `break`
+- `for range`

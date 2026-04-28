@@ -100,7 +100,6 @@ object PIRFuzzSupportChecker {
 
             is PIRLoadMemExpr -> issues += issue(moduleName, function, expr.line, "unsupported memory load")
             is PIRGetElementPtrExpr -> issues += issue(moduleName, function, expr.line, "unsupported pointer field access")
-            is PIRPhiExpr -> issues += issue(moduleName, function, expr.line, "unsupported phi node")
             is PIRSetMemExpr -> issues += issue(moduleName, function, expr.line, "unsupported memory write")
             is PIRSetElementExpr -> issues += issue(moduleName, function, expr.line, "unsupported low-level field write")
             else -> Unit
