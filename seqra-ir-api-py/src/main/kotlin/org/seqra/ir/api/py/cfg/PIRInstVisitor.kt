@@ -1,3 +1,5 @@
+package org.seqra.ir.api.py.cfg
+
 import org.seqra.ir.api.py.cfg.*
 
 interface PIRInstVisitor<T> {

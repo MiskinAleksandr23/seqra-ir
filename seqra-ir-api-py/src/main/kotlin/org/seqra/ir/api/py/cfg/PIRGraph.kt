@@ -1,9 +1,6 @@
 package org.seqra.ir.api.py.cfg
 
-import PIRInstVisitor
 import org.seqra.ir.api.py.PIRClass
-
-
 
 interface PIRGraph : PIRBytecodeGraph<PIRInst> {
     override val instructions: List<PIRInst>
@@ -48,4 +45,3 @@ class PIRCatchInst(
     override fun <T> accept(visitor: PIRInstVisitor<T>): T =
         error("Catch instruction is not part of the minimal visitor set")
 }
-

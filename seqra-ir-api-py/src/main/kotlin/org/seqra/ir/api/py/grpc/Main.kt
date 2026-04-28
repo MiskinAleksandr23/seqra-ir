@@ -9,10 +9,23 @@ import kotlinx.coroutines.runBlocking
 import org.seqra.ir.api.py.emit.PIRToPythonEmitter
 import org.seqra.ir.api.py.mapper.ProtoToPirMapper
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.io.path.writeText
 
-fun main(): Unit = runBlocking {
+private data class ClientConfig(
+    val host: String,
+    val port: Int,
+    val files: List<String>,
+    val outputDir: Path,
+    val jsonOutput: Path?,
+    val includeMetadata: Boolean
+)
+
+fun main(args: Array<String>): Unit = runBlocking {
+    val config = parseArgs(args) ?: return@runBlocking
     val channel = ManagedChannelBuilder
-        .forAddress("localhost", 50051)
+        .forAddress(config.host, config.port)
         .usePlaintext()
         .build()
 
@@ -21,10 +34,10 @@ fun main(): Unit = runBlocking {
     val request = SourceRequest.newBuilder()
         .setFiles(
             FileList.newBuilder()
-                .addFiles("/mnt/c/MKN/project2/test.py")
+                .addAllFiles(config.files)
                 .build()
         )
-        .setIncludeMetadata(true)
+        .setIncludeMetadata(config.includeMetadata)
         .build()
 
     val response = stub.getAll(request)
@@ -34,7 +47,11 @@ fun main(): Unit = runBlocking {
         .preservingProtoFieldNames()
         .print(response)
 
-    File("output.json").writeText(jsonString)
+    config.jsonOutput?.let {
+        Files.createDirectories(it.parent ?: Path.of("."))
+        it.writeText(jsonString)
+        println("Saved response JSON: $it")
+    }
 
     println("Success: ${response.success}")
     println("Module count: ${response.modules.modulesCount}")
@@ -51,13 +68,82 @@ fun main(): Unit = runBlocking {
     val pirModules = mapper.mapComplete(response)
 
     val emitter = PIRToPythonEmitter()
+    Files.createDirectories(config.outputDir)
 
     pirModules.forEach { module ->
         val code = emitter.emitModule(module)
-        val fileName = module.fullname.substringAfterLast('.').replace(".", "_") + "_generated.py"
-        File(fileName).writeText(code)
-        println("Generated Python file: $fileName")
+        val outputPath = moduleOutputPath(module.fullname, config.outputDir)
+        Files.createDirectories(outputPath.parent)
+        outputPath.writeText(code)
+        println("Generated Python file: $outputPath")
     }
 
     channel.shutdown()
+}
+
+private fun parseArgs(args: Array<String>): ClientConfig? {
+    var host = System.getenv("SEQRA_PY_GRPC_HOST") ?: "127.0.0.1"
+    var port = (System.getenv("SEQRA_PY_GRPC_PORT") ?: "50051").toInt()
+    var outputDir = Path.of(System.getenv("SEQRA_PY_OUT_DIR") ?: ".")
+    var jsonOutput: Path? = null
+    var includeMetadata = true
+    val files = mutableListOf<String>()
+
+    var index = 0
+    while (index < args.size) {
+        when (val arg = args[index]) {
+            "--help", "-h" -> {
+                printUsage()
+                return null
+            }
+            "--host" -> {
+                host = args.getOrNull(++index) ?: error("Missing value for --host")
+            }
+            "--port" -> {
+                port = args.getOrNull(++index)?.toIntOrNull()
+                    ?: error("Missing or invalid value for --port")
+            }
+            "--out-dir" -> {
+                outputDir = Path.of(args.getOrNull(++index) ?: error("Missing value for --out-dir"))
+            }
+            "--json-out" -> {
+                jsonOutput = Path.of(args.getOrNull(++index) ?: error("Missing value for --json-out"))
+            }
+            "--no-metadata" -> includeMetadata = false
+            else -> {
+                require(!arg.startsWith("--")) { "Unknown option: $arg" }
+                files += arg
+            }
+        }
+        index++
+    }
+
+    if (files.isEmpty()) {
+        printUsage()
+        return null
+    }
+
+    return ClientConfig(
+        host = host,
+        port = port,
+        files = files,
+        outputDir = outputDir,
+        jsonOutput = jsonOutput,
+        includeMetadata = includeMetadata
+    )
+}
+
+private fun moduleOutputPath(moduleName: String, outputDir: Path): Path {
+    val parts = moduleName.split('.').filter { it.isNotBlank() }
+    val fileName = parts.lastOrNull()?.replace(".", "_")?.plus("_generated.py") ?: "module_generated.py"
+    val parent = parts.dropLast(1).fold(outputDir) { acc, part -> acc.resolve(part) }
+    return parent.resolve(fileName)
+}
+
+private fun printUsage() {
+    println(
+        """
+        Usage: MainKt [--host HOST] [--port PORT] [--out-dir DIR] [--json-out FILE] [--no-metadata] <python-file>...
+        """.trimIndent()
+    )
 }

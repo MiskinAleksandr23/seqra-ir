@@ -1,4 +1,5 @@
 import org.seqra.common.KotlinDependency
+import org.seqra.common.JunitDependencies
 
 plugins {
     id("kotlin-conventions")
@@ -24,10 +25,20 @@ dependencies {
     api(Libs.grpc_kotlin_stub)
 
     implementation("io.grpc:grpc-netty-shaded:${Versions.grpc}")
+
+    testImplementation(platform(JunitDependencies.Libs.junit_bom))
+    testImplementation(JunitDependencies.Libs.junit_jupiter)
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions { freeCompilerArgs.add("-opt-in=kotlin.RequiresOptIn") }
+}
+
+tasks.register<JavaExec>("runPyGrpcClient") {
+    group = "application"
+    description = "Runs the Kotlin gRPC client for Python IR conversion"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("org.seqra.ir.api.py.grpc.MainKt")
 }
 
 protobuf {
