@@ -1,0 +1,6 @@
+{
+  "description": "Reverse range loop with negative step, continue, and break",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [7]
+}

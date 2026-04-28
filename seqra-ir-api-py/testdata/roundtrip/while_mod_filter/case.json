@@ -1,0 +1,6 @@
+{
+  "description": "While loop that filters by modulo and uses continue",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [8]
+}

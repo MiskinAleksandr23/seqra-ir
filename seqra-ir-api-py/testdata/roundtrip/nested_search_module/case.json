@@ -1,0 +1,6 @@
+{
+  "description": "Nested while search with break propagation and cross-module scoring",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [5]
+}

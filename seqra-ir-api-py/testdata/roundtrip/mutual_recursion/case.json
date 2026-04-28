@@ -1,0 +1,6 @@
+{
+  "description": "Mutual recursion between even and odd predicates",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [7]
+}

@@ -1,0 +1,6 @@
+{
+  "description": "For-range with positive non-unit step",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [9]
+}

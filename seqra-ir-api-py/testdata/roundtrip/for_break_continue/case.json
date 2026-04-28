@@ -1,0 +1,6 @@
+{
+  "description": "For range loop with continue and break branches",
+  "entry_file": "main.py",
+  "function": "main",
+  "args_json": [8]
+}

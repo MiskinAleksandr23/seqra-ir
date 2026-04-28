@@ -29,6 +29,9 @@ class PIRToPythonEmitter(
     private val options: EmitOptions = EmitOptions()
 ) {
     private var currentModule: PIRModule? = null
+    private var currentFunction: PIRFunc? = null
+    private var currentBlock: PIRBasicBlock? = null
+    private var currentPredecessors: Map<Int, List<PIRBasicBlock>> = emptyMap()
 
     fun emitModule(module: PIRModule): String {
         currentModule = module
@@ -155,6 +158,10 @@ class PIRToPythonEmitter(
         out.appendLine("        raise RuntimeError(class_name)")
         out.appendLine("    raise RuntimeError(f'{class_name}: {value}')")
         out.appendLine()
+
+        out.appendLine("def __pir_bad_phi(prev_pc, current_pc):")
+        out.appendLine("    raise RuntimeError(f'bad phi predecessor: prev_pc={prev_pc}, current_pc={current_pc}')")
+        out.appendLine()
     }
 
     private fun emitModuleImports(module: PIRModule, out: StringBuilder) {
@@ -216,6 +223,9 @@ class PIRToPythonEmitter(
     }
 
     private fun emitFunction(fn: PIRFunc, out: StringBuilder, indent: String) {
+        currentFunction = fn
+        currentPredecessors = computePredecessors(fn)
+
         when (fn.decl.kind) {
             PIR_FUNC_STATICMETHOD -> out.appendLine("${indent}@staticmethod")
             PIR_FUNC_CLASSMETHOD -> out.appendLine("${indent}@classmethod")
@@ -240,11 +250,13 @@ class PIRToPythonEmitter(
 
         val entryPc = fn.blocks.first().start.index
         out.appendLine("${inner}__pc = $entryPc")
+        out.appendLine("${inner}__prev_pc = None")
         out.appendLine("${inner}while True:")
 
         val loopIndent = inner + "    "
 
         fn.blocks.forEachIndexed { idx, block ->
+            currentBlock = block
             val keyword = if (idx == 0) "if" else "elif"
             out.appendLine("${loopIndent}$keyword __pc == ${block.start.index}:")
 
@@ -266,6 +278,7 @@ class PIRToPythonEmitter(
                 ) {
                     val nextBlock = nextBlock(fn, block)
                     if (nextBlock != null) {
+                        out.appendLine("${blockIndent}__prev_pc = __pc")
                         out.appendLine("${blockIndent}__pc = ${nextBlock.start.index}")
                         out.appendLine("${blockIndent}continue")
                     } else {
@@ -277,6 +290,9 @@ class PIRToPythonEmitter(
 
         out.appendLine("${loopIndent}else:")
         out.appendLine("${loopIndent}    raise RuntimeError(f'bad pc: {__pc}')")
+        currentBlock = null
+        currentFunction = null
+        currentPredecessors = emptyMap()
     }
 
     private fun emitInst(inst: PIRInst, out: StringBuilder, indent: String) {
@@ -290,6 +306,7 @@ class PIRToPythonEmitter(
             }
 
             is PIRGotoInst -> {
+                out.appendLine("${indent}__prev_pc = __pc")
                 out.appendLine("${indent}__pc = ${inst.target.index}")
                 out.appendLine("${indent}continue")
             }
@@ -299,8 +316,10 @@ class PIRToPythonEmitter(
                 val actual = if (inst.negated) "(not ($cond))" else cond
 
                 out.appendLine("${indent}if $actual:")
+                out.appendLine("${indent}    __prev_pc = __pc")
                 out.appendLine("${indent}    __pc = ${inst.trueBranch.index}")
                 out.appendLine("${indent}else:")
+                out.appendLine("${indent}    __prev_pc = __pc")
                 out.appendLine("${indent}    __pc = ${inst.falseBranch.index}")
                 out.appendLine("${indent}continue")
             }
@@ -396,6 +415,15 @@ class PIRToPythonEmitter(
             "CPyTagged_Multiply" ->
                 if (taggedArgs.size == 2) "(${taggedArgs[0]} * ${taggedArgs[1]})" else "__pir_call_c(${quote(expr.functionName)}, ${args.joinToString(", ")})"
 
+            "CPyTagged_Remainder" ->
+                if (taggedArgs.size == 2) "(${taggedArgs[0]} % ${taggedArgs[1]})" else "__pir_call_c(${quote(expr.functionName)}, ${args.joinToString(", ")})"
+
+            "CPyTagged_Rshift" ->
+                if (taggedArgs.size == 2) "(${taggedArgs[0]} >> ${taggedArgs[1]})" else "__pir_call_c(${quote(expr.functionName)}, ${args.joinToString(", ")})"
+
+            "CPyTagged_TrueDivide" ->
+                if (taggedArgs.size == 2) "(${taggedArgs[0]} / ${taggedArgs[1]})" else "__pir_call_c(${quote(expr.functionName)}, ${args.joinToString(", ")})"
+
             "PyNumber_Add" ->
                 if (args.size == 2) "(${args[0]} + ${args[1]})" else "__pir_call_c(${quote(expr.functionName)}, ${args.joinToString(", ")})"
 
@@ -437,6 +465,35 @@ class PIRToPythonEmitter(
                 if (taggedArgs.size == 2) "(${taggedArgs[0]} >= ${taggedArgs[1]})" else "__pir_primitive(${quote(expr.primitive.name)}${if (args.isNotEmpty()) ", $args" else ""})"
 
             else -> "__pir_primitive(${quote(expr.primitive.name)}${if (args.isNotEmpty()) ", $args" else ""})"
+        }
+    }
+
+    private fun emitPhi(expr: PIRPhiExpr): String {
+        val block = currentBlock
+        if (expr.values.isEmpty()) {
+            return "None"
+        }
+        if (block == null) {
+            return emitValue(expr.values.first())
+        }
+
+        val predecessors = currentPredecessors[block.start.index].orEmpty().sortedBy { it.start.index }
+        if (predecessors.isEmpty()) {
+            return emitValue(expr.values.first())
+        }
+        if (predecessors.size != expr.values.size) {
+            if (options.failOnUnsupported) {
+                error(
+                    "Unsupported phi in ${currentFunction?.fullname ?: "<unknown>"}: " +
+                        "predecessors=${predecessors.size}, values=${expr.values.size}, block=${block.start.index}"
+                )
+            }
+            return emitValue(expr.values.first())
+        }
+
+        val arms = predecessors.zip(expr.values)
+        return arms.asReversed().fold("__pir_bad_phi(__prev_pc, __pc)") { acc, (pred, value) ->
+            "(${emitValue(value)} if __prev_pc == ${pred.start.index} else $acc)"
         }
     }
 
@@ -534,9 +591,7 @@ class PIRToPythonEmitter(
 
             is PIRLoadGlobalExpr -> pySafeName(expr.identifier)
 
-            is PIRPhiExpr -> {
-                if (expr.values.isEmpty()) "None" else emitValue(expr.values.first())
-            }
+            is PIRPhiExpr -> emitPhi(expr)
 
             is PIRTruthExpr -> emitValue(expr.value)
 
@@ -550,7 +605,7 @@ class PIRToPythonEmitter(
         return when (value) {
             is PIRRegister -> pyName(value.name)
             is PIRArgument -> pyName(value.name)
-            is PIRInteger -> value.value.toString()
+            is PIRInteger -> decodeImmediateInteger(value).toString()
             is PIRFloat -> value.value.toString()
             is PIRCString -> quote(value.value.decodeToString())
             is PIRUndef -> "None"
@@ -560,14 +615,16 @@ class PIRToPythonEmitter(
 
     private fun emitTaggedValue(value: PIRValue): String {
         return when (value) {
-            is PIRInteger -> {
-                if (value.value % 2 == 0) {
-                    (value.value / 2).toString()
-                } else {
-                    value.value.toString()
-                }
-            }
+            is PIRInteger -> decodeImmediateInteger(value).toString()
             else -> emitValue(value)
+        }
+    }
+
+    private fun decodeImmediateInteger(value: PIRInteger): Int {
+        return if (value.type.name == "short_int" && value.value % 2 == 0) {
+            value.value / 2
+        } else {
+            value.value
         }
     }
 
@@ -644,6 +701,32 @@ class PIRToPythonEmitter(
     private fun nextBlock(fn: PIRFunc, current: PIRBasicBlock): PIRBasicBlock? {
         val idx = fn.blocks.indexOf(current)
         return if (idx >= 0 && idx + 1 < fn.blocks.size) fn.blocks[idx + 1] else null
+    }
+
+    private fun computePredecessors(fn: PIRFunc): Map<Int, List<PIRBasicBlock>> {
+        val predecessors = fn.blocks.associate { it.start.index to mutableListOf<PIRBasicBlock>() }
+        val byStart = fn.blocks.associateBy { it.start.index }
+
+        fn.blocks.forEach { block ->
+            successorBlocks(fn, block).forEach { successor ->
+                predecessors.getValue(successor.start.index).add(block)
+            }
+        }
+
+        return predecessors.mapValues { (_, value) ->
+            value.distinctBy { it.start.index }.sortedBy { it.start.index }
+        }.filterKeys { byStart.containsKey(it) }
+    }
+
+    private fun successorBlocks(fn: PIRFunc, block: PIRBasicBlock): List<PIRBasicBlock> {
+        val last = instructionsOf(fn, block).lastOrNull() ?: return nextBlock(fn, block)?.let(::listOf) ?: emptyList()
+
+        return when (last) {
+            is PIRGotoInst -> fn.blocks.filter { it.start.index == last.target.index }
+            is PIRIfInst -> fn.blocks.filter { it.start.index == last.trueBranch.index || it.start.index == last.falseBranch.index }
+            is PIRReturnInst, is PIRUnreachableInst -> emptyList()
+            else -> nextBlock(fn, block)?.let(::listOf) ?: emptyList()
+        }
     }
 
     private fun pyName(name: String): String {
